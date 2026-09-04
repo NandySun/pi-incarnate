@@ -2,8 +2,17 @@
   "name": "pi-incarnate",
   "version": "0.1.0",
   "description": "A character persona layer for Pi Agent",
+  "author": "NandySun",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NandySun/pi-incarnate.git"
+  },
+  "homepage": "https://github.com/NandySun/pi-incarnate#readme",
+  "bugs": {
+    "url": "https://github.com/NandySun/pi-incarnate/issues"
+  },
   "keywords": [
     "pi-package",
     "pi-agent",
