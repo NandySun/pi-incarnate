@@ -1,0 +1,16 @@
+# Security
+
+Pi extensions execute with the same system permissions as Pi. Review this package and every character card before installing content from an untrusted source.
+
+`pi-incarnate` applies these local boundaries:
+
+- Character IDs cannot contain path separators or traversal segments.
+- Character directories cannot be symbolic links.
+- Declared form paths must resolve to readable files inside their character directory.
+- Form contents are never loaded or cached by the extension itself.
+- ASCII avatars have terminal control sequences removed and are size-limited.
+- The personality layer is appended without replacing Pi's existing tool, permission, or safety instructions, and explicitly tells the model to preserve those boundaries.
+
+Do not include secrets in character cards or preference forms. A character can ask Pi to read an available declared form when relevant, so those files should contain only information you intend to expose to the active model.
+
+For a private vulnerability report, contact the repository owner through the hosting platform once the public repository is established. Do not publish secrets or exploit details in a public issue.
