@@ -2,7 +2,7 @@
 
 让角色进入 Pi Agent 的对话现场：通过可编辑角色卡、稳定的人格层、会话内 mood 和持久 TUI ASCII 头像，让非 coding 对话拥有更强的在场感，同时保留 Pi 原有工具、安全边界和任务完成能力。
 
-当前版本为 `0.1.0`，已在 Pi `0.85.0` 验证，要求 Node.js `>=22.19.0`。第一版不做世界书、自动长期记忆或隐式角色切换。
+最新 npm 版本为 `0.1.0`；当前 `main` 包含尚未发布的交互菜单和角色卡编辑功能。项目已在 Pi `0.85.0` 验证，要求 Node.js `>=22.19.0`。第一版不做世界书、自动长期记忆或隐式角色切换。
 
 ## 安装与启动
 
@@ -41,6 +41,22 @@ pi remove /home/revmsonwe/Projects/pi-incarnate
 
 ## 命令
 
+在 Pi 中只输入下面这条命令，会打开键盘导航菜单：
+
+```text
+/incarnate
+```
+
+使用 `↑` / `↓` 移动，`Enter` 选择，`Esc` 返回或关闭。菜单可以完成：
+
+- 选择或关闭角色。
+- 切换当前角色的 mood。
+- 切换头像的 `auto`、`full`、`compact`、`off` 模式。
+- 查看当前状态。
+- 创建新角色卡，或编辑已有角色卡。
+
+原有子命令继续保留，适合熟悉命令后直接调用或编写脚本：
+
 ```text
 /incarnate list
 /incarnate use <character-id>
@@ -61,7 +77,17 @@ pi remove /home/revmsonwe/Projects/pi-incarnate
 
 ## 编写角色卡
 
-在 `characters/` 下创建直属目录。目录名就是 character ID，只允许小写 ASCII 字母、数字和内部连字符：
+推荐直接运行 `/incarnate`，选择 `Create character card`。依次输入角色 ID 和显示名后，Pi 会打开带完整结构的多行模板：`Enter` 保存，`Shift+Enter` 或 `Ctrl+J` 插入换行，`Ctrl+G` 可调用外部编辑器，`Esc` 取消且不写入文件。
+
+个人角色保存在：
+
+```text
+~/.pi/agent/pi-incarnate/characters/<character-id>/
+```
+
+设置了 `PI_CODING_AGENT_DIR` 时，以该目录代替 `~/.pi/agent`。npm 包中的 `characters/` 是只读内置角色；通过菜单编辑内置角色时，会先创建个人覆盖副本，因此升级或重装 npm 包不会抹掉修改。同 ID 的个人角色优先于内置角色。
+
+也可以手动创建目录。目录名就是 character ID，只允许小写 ASCII 字母、数字和内部连字符：
 
 ```text
 characters/
@@ -112,11 +138,13 @@ Default: warm
 
 扩展只解析这些显式列表项并检查路径，不读取、不复制、不缓存表单内容。绝对路径、`..` 穿越、目录以及解析到角色目录外的符号链接都会被标为无效。
 
+菜单保存角色卡前会执行与运行时相同的必需章节和 mood 校验。格式错误时保留原文件并显示原因；创建过程使用暂存目录，编辑过程使用同目录临时文件原子替换。
+
 `avatar.txt` 会去除 ANSI 和终端控制序列，tab 展开为空格，最多显示 12 行、每行 48 个终端列。头像损坏或不可读时只降级为角色状态行，不会关闭已经启用的人格。
 
 ## 故障排查
 
-- `No valid characters found`：确认角色位于包内 `characters/<id>/CHARACTER.md`，目录 ID 合法。
+- `No valid characters found`：确认角色位于个人目录或包内 `characters/<id>/CHARACTER.md`，目录 ID 合法。
 - `missing required non-empty sections`：补齐四个必需的二级章节，并确保正文非空。
 - `Current Mood ...`：检查 `Default:`、三级标题 preset ID 和对应正文。
 - `Forms: n/m available`：运行 `/incarnate status` 后检查缺失文件；表单路径必须留在角色目录内。
@@ -128,9 +156,12 @@ Default: warm
 ```text
 extensions/index.ts       Pi 扩展入口和生命周期
 src/character-loader.ts   角色发现、UTF-8 与章节验证
+src/character-catalog.ts  个人/内置角色合并与覆盖规则
+src/character-editor.ts   模板、校验、安全创建与原子保存
 src/session-state.ts      当前 session 的角色/mood/avatar 状态
 src/persona.ts            有界人格 prompt 组合
 src/commands.ts           /incarnate 命令
+src/menu.ts               键盘导航菜单与角色卡编辑流程
 src/avatar.ts             ASCII 清理、裁剪和 widget 内容
 src/mood.ts               mood 预设解析和 prompt 片段
 src/forms.ts              表单声明解析与路径边界校验

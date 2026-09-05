@@ -1,11 +1,19 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 
-import { CharacterLoadError, discoverCharacters, loadCharacter } from "./character-loader.ts";
+import {
+  characterSource,
+  discoverCharacterCatalog,
+  loadCatalogCharacter,
+  type CharacterLocations,
+} from "./character-catalog.ts";
+import { CharacterLoadError } from "./character-loader.ts";
+import { openIncarnateMenu } from "./menu.ts";
 import type { AvatarMode } from "./session-state.ts";
 import type { IncarnateSessionState } from "./session-state.ts";
 
 export interface IncarnateCommandDependencies {
   charactersRoot: string;
+  personalCharactersRoot?: string;
   state: IncarnateSessionState;
   onStateChange?: (ctx: ExtensionCommandContext) => Promise<void> | void;
 }
@@ -18,10 +26,11 @@ function notifyError(ctx: ExtensionCommandContext, message: string): void {
 }
 
 export function registerIncarnateCommand(pi: ExtensionAPI, dependencies: IncarnateCommandDependencies): void {
-  const { charactersRoot, state, onStateChange } = dependencies;
+  const { charactersRoot, personalCharactersRoot, state, onStateChange } = dependencies;
+  const locations: CharacterLocations = { builtInRoot: charactersRoot, personalRoot: personalCharactersRoot };
 
   pi.registerCommand("incarnate", {
-    description: "List, enable, disable, or inspect character personas",
+    description: "Open the character menu or manage personas with subcommands",
     getArgumentCompletions: async (prefix) => {
       const [subcommand = "", argument = ""] = prefix.trimStart().split(/\s+/, 2);
       if (!prefix.trimStart().includes(" ")) {
@@ -42,27 +51,31 @@ export function registerIncarnateCommand(pi: ExtensionAPI, dependencies: Incarna
         return matches.length > 0 ? matches : null;
       }
       if (subcommand !== "use") return null;
-      const { characters } = await discoverCharacters(charactersRoot);
-      const matches = characters
-        .filter((character) => character.id.startsWith(argument))
-        .map((character) => ({ value: `use ${character.id}`, label: character.id, description: character.name }));
+      const { entries } = await discoverCharacterCatalog(locations);
+      const matches = entries
+        .filter(({ character }) => character.id.startsWith(argument))
+        .map(({ character }) => ({ value: `use ${character.id}`, label: character.id, description: character.name }));
       return matches.length > 0 ? matches : null;
     },
     handler: async (args, ctx) => {
       const [subcommand = "", id, ...extra] = args.trim().split(/\s+/).filter(Boolean);
 
       if (!subcommand) {
-        ctx.ui.notify(USAGE, "info");
+        if (ctx.hasUI) {
+          await openIncarnateMenu(ctx, { locations, state, onStateChange });
+        } else {
+          ctx.ui.notify(USAGE, "info");
+        }
         return;
       }
 
       if (subcommand === "list" && !id) {
-        const { characters, issues } = await discoverCharacters(charactersRoot);
-        if (characters.length === 0) {
-          ctx.ui.notify(`No valid characters found in ${charactersRoot}`, "warning");
+        const { entries, issues } = await discoverCharacterCatalog(locations);
+        if (entries.length === 0) {
+          ctx.ui.notify("No valid characters found", "warning");
         } else {
-          const list = characters
-            .map((character) => `${character.id} — ${character.name}${state.activeCharacter?.id === character.id ? " (active)" : ""}`)
+          const list = entries
+            .map(({ character, source }) => `${character.id} — ${character.name}${state.activeCharacter?.id === character.id ? " (active)" : ""} [${source}]`)
             .join("\n");
           ctx.ui.notify(list, "info");
         }
@@ -74,7 +87,7 @@ export function registerIncarnateCommand(pi: ExtensionAPI, dependencies: Incarna
 
       if (subcommand === "use" && id && extra.length === 0) {
         try {
-          const character = await loadCharacter(charactersRoot, id);
+          const { character } = await loadCatalogCharacter(locations, id);
           state.activate(character);
           await onStateChange?.(ctx);
           ctx.ui.notify(`Character enabled: ${character.name} (${character.id})`, "info");
@@ -97,7 +110,7 @@ export function registerIncarnateCommand(pi: ExtensionAPI, dependencies: Incarna
         const active = state.activeCharacter;
         ctx.ui.notify(
           active
-            ? `Active character: ${active.name} (${active.id})\nMood: ${state.currentMood ?? "none"}\nAvatar: ${state.avatarMode}\nForms: ${active.forms.filter((form) => form.status === "available").length}/${active.forms.length} available\nCard: ${active.cardPath}`
+            ? `Active character: ${active.name} (${active.id})\nSource: ${characterSource(active, locations)}\nMood: ${state.currentMood ?? "none"}\nAvatar: ${state.avatarMode}\nForms: ${active.forms.filter((form) => form.status === "available").length}/${active.forms.length} available\nCard: ${active.cardPath}`
             : `Character mode: off\nAvatar: ${state.avatarMode}`,
           "info",
         );

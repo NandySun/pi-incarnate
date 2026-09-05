@@ -6,6 +6,8 @@ Pi extensions execute with the same system permissions as Pi. Review this packag
 
 - Character IDs cannot contain path separators or traversal segments.
 - Character directories cannot be symbolic links.
+- Built-in package characters are never edited in place; menu edits create a personal override under the Pi configuration directory.
+- Character-card writes are validated before an atomic replacement, and copied character resources reject symbolic links and non-regular files.
 - Declared form paths must resolve to readable files inside their character directory.
 - Form contents are never loaded or cached by the extension itself.
 - ASCII avatars have terminal control sequences removed and are size-limited.

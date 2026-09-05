@@ -1,4 +1,6 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { AvatarLoadError, createAvatarWidget, loadAvatar, renderAvatarWidget } from "../src/avatar.ts";
@@ -7,6 +9,8 @@ import { appendPersonaPrompt } from "../src/persona.ts";
 import { IncarnateSessionState } from "../src/session-state.ts";
 
 const charactersRoot = fileURLToPath(new URL("../characters", import.meta.url));
+const agentConfigRoot = process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
+const personalCharactersRoot = join(agentConfigRoot, "pi-incarnate", "characters");
 
 export default function incarnateExtension(pi: ExtensionAPI): void {
   const state = new IncarnateSessionState();
@@ -33,7 +37,12 @@ export default function incarnateExtension(pi: ExtensionAPI): void {
     }
   };
 
-  registerIncarnateCommand(pi, { charactersRoot, state, onStateChange: refreshWidget });
+  registerIncarnateCommand(pi, {
+    charactersRoot,
+    personalCharactersRoot,
+    state,
+    onStateChange: refreshWidget,
+  });
 
   pi.on("session_start", async (_event, ctx) => {
     state.reset();

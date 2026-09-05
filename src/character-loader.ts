@@ -41,6 +41,13 @@ export interface CharacterDiscovery {
   issues: CharacterIssue[];
 }
 
+export interface ParsedCharacterCard {
+  markdown: string;
+  name: string;
+  sections: Readonly<Record<RequiredSection, string>>;
+  mood: MoodConfig;
+}
+
 export class CharacterLoadError extends Error {
   readonly code: CharacterIssueCode;
   readonly path: string;
@@ -94,6 +101,19 @@ function parseCard(markdown: string, cardPath: string): Pick<Character, "name" |
   };
 }
 
+export function parseCharacterCard(markdown: string, cardPath = "CHARACTER.md"): ParsedCharacterCard {
+  const normalized = markdown.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").trim();
+  const parsed = parseCard(normalized, cardPath);
+  let mood: MoodConfig;
+  try {
+    mood = parseMoodConfig(normalized);
+  } catch (error) {
+    const message = error instanceof MoodConfigError ? error.message : "Invalid Current Mood section";
+    throw new CharacterLoadError("invalid-card", message, cardPath);
+  }
+  return { markdown: normalized, mood, ...parsed };
+}
+
 export function isCharacterId(value: string): boolean {
   return CHARACTER_ID_PATTERN.test(value);
 }
@@ -139,17 +159,9 @@ export async function loadCharacter(charactersRoot: string, id: string): Promise
     throw new CharacterLoadError("missing-card", `Missing or unreadable CHARACTER.md for: ${id}`, cardPath);
   }
 
-  const markdown = decodeUtf8(buffer, cardPath).replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").trim();
-  const parsed = parseCard(markdown, cardPath);
-  let mood: MoodConfig;
-  try {
-    mood = parseMoodConfig(markdown);
-  } catch (error) {
-    const message = error instanceof MoodConfigError ? error.message : "Invalid Current Mood section";
-    throw new CharacterLoadError("invalid-card", message, cardPath);
-  }
-  const forms = await resolveFormReferences(characterDirectory, markdown);
-  return { id, directory: characterDirectory, cardPath, markdown, mood, forms, ...parsed };
+  const parsed = parseCharacterCard(decodeUtf8(buffer, cardPath), cardPath);
+  const forms = await resolveFormReferences(characterDirectory, parsed.markdown);
+  return { id, directory: characterDirectory, cardPath, forms, ...parsed };
 }
 
 export async function discoverCharacters(charactersRoot: string): Promise<CharacterDiscovery> {
