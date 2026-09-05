@@ -46,9 +46,10 @@ test("auto mode uses the full right-aligned avatar when enough width is availabl
 
   assert.equal(resolveAvatarMode("auto", 100, "pi-incarnate · 弥拉 · mood: warm", avatar), "full");
   assert.equal(lines.length, avatar.lines.length);
-  assert.match(lines[0] ?? "", /^pi-incarnate · 弥拉 · mood: warm\s+ \/\\_\/\\$/);
+  assert.match(lines[0] ?? "", /^\s+ \/\\_\/\\$/);
+  assert.match(lines.at(-1) ?? "", /^pi-incarnate · 弥拉 · mood: warm\s+ > \^ <$/);
   assert.ok(lines.every((line) => visibleWidth(line) <= 100));
-  assert.ok(lines.slice(1).every((line) => visibleWidth(line) === 100));
+  assert.ok(lines.every((line) => visibleWidth(line) === 100));
 });
 
 test("auto mode collapses to the status header in a narrow terminal", () => {
@@ -63,4 +64,5 @@ test("forced full mode stays within the supplied terminal width", () => {
 
   assert.equal(lines.length, avatar.lines.length + 1);
   assert.ok(lines.every((line) => visibleWidth(line) <= 18));
+  assert.match(lines.at(-1) ?? "", /^pi-incarnate/);
 });

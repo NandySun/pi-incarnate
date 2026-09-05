@@ -106,13 +106,13 @@ export function renderAvatarWidget(
   if (mode === "compact" || !avatar || avatar.lines.length === 0) return [header];
 
   const avatarWidth = Math.min(width, Math.max(...avatar.lines.map((line) => visibleWidth(line))));
-  const canShareFirstLine = visibleWidth(header) + 2 + avatarWidth <= width;
+  const canShareLastLine = visibleWidth(header) + 2 + avatarWidth <= width;
   const renderedAvatar = avatar.lines.map((line) => rightAlign(line, width));
-  if (!canShareFirstLine) return [header, ...renderedAvatar];
+  if (!canShareLastLine) return [...renderedAvatar, header];
 
-  const firstAvatarLine = truncateToWidth(avatar.lines[0] ?? "", avatarWidth, "");
-  const gap = " ".repeat(Math.max(2, width - visibleWidth(header) - visibleWidth(firstAvatarLine)));
-  return [`${header}${gap}${firstAvatarLine}`, ...renderedAvatar.slice(1)];
+  const lastAvatarLine = truncateToWidth(avatar.lines.at(-1) ?? "", avatarWidth, "");
+  const gap = " ".repeat(Math.max(2, width - visibleWidth(header) - visibleWidth(lastAvatarLine)));
+  return [...renderedAvatar.slice(0, -1), `${header}${gap}${lastAvatarLine}`];
 }
 
 export function createAvatarWidget(
