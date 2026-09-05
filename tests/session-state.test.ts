@@ -26,13 +26,22 @@ const character = {
 test("session state activates and deactivates a character", () => {
   const state = new IncarnateSessionState();
   assert.equal(state.activeCharacter, undefined);
+  assert.equal(state.avatarMode, "auto");
 
   state.activate(character);
   assert.equal(state.snapshot().activeCharacter, character);
   assert.equal(state.currentMood, "warm");
 
+  state.setAvatarMode("full");
+  assert.equal(state.avatarMode, "full");
+  assert.equal(state.avatarEnabled, true);
+
   state.setAvatarEnabled(false);
   assert.equal(state.avatarEnabled, false);
+  assert.equal(state.avatarMode, "off");
+
+  state.setAvatarEnabled(true);
+  assert.equal(state.avatarMode, "auto");
 
   state.deactivate();
   assert.equal(state.activeCharacter, undefined);
@@ -40,4 +49,5 @@ test("session state activates and deactivates a character", () => {
 
   state.reset();
   assert.equal(state.avatarEnabled, true);
+  assert.equal(state.avatarMode, "auto");
 });

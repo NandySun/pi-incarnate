@@ -1,7 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { fileURLToPath } from "node:url";
 
-import { AvatarLoadError, loadAvatar, renderAvatarWidget } from "../src/avatar.ts";
+import { AvatarLoadError, createAvatarWidget, loadAvatar, renderAvatarWidget } from "../src/avatar.ts";
 import { registerIncarnateCommand } from "../src/commands.ts";
 import { appendPersonaPrompt } from "../src/persona.ts";
 import { IncarnateSessionState } from "../src/session-state.ts";
@@ -14,16 +14,21 @@ export default function incarnateExtension(pi: ExtensionAPI): void {
   const refreshWidget = async (ctx: ExtensionContext): Promise<void> => {
     if (!ctx.hasUI) return;
     const character = state.activeCharacter;
-    if (!character || !state.avatarEnabled) {
+    const avatarMode = state.avatarMode;
+    if (!character || avatarMode === "off") {
       ctx.ui.setWidget("pi-incarnate", undefined);
       return;
     }
     try {
       const avatar = await loadAvatar(character);
-      ctx.ui.setWidget("pi-incarnate", renderAvatarWidget(character, state.currentMood, avatar));
+      if (ctx.mode === "tui") {
+        ctx.ui.setWidget("pi-incarnate", () => createAvatarWidget(character, state.currentMood, avatar, avatarMode));
+      } else {
+        ctx.ui.setWidget("pi-incarnate", renderAvatarWidget(character, state.currentMood, avatar, undefined, avatarMode));
+      }
     } catch (error) {
       const message = error instanceof AvatarLoadError ? error.message : "Failed to load avatar";
-      ctx.ui.setWidget("pi-incarnate", renderAvatarWidget(character, state.currentMood, undefined));
+      ctx.ui.setWidget("pi-incarnate", renderAvatarWidget(character, state.currentMood, undefined, undefined, avatarMode));
       ctx.ui.notify(message, "warning");
     }
   };

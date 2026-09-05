@@ -1,6 +1,7 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 
 import { CharacterLoadError, discoverCharacters, loadCharacter } from "./character-loader.ts";
+import type { AvatarMode } from "./session-state.ts";
 import type { IncarnateSessionState } from "./session-state.ts";
 
 export interface IncarnateCommandDependencies {
@@ -10,7 +11,7 @@ export interface IncarnateCommandDependencies {
 }
 
 const USAGE =
-  "Usage: /incarnate list | use <character-id> | off | status | mood <preset> | avatar on|off";
+  "Usage: /incarnate list | use <character-id> | off | status | mood <preset> | avatar auto|full|compact|off";
 
 function notifyError(ctx: ExtensionCommandContext, message: string): void {
   ctx.ui.notify(message, "error");
@@ -29,7 +30,7 @@ export function registerIncarnateCommand(pi: ExtensionAPI, dependencies: Incarna
           .map((value) => ({ value, label: value }));
       }
       if (subcommand === "avatar") {
-        const matches = ["on", "off"]
+        const matches = ["auto", "full", "compact", "off", "on"]
           .filter((value) => value.startsWith(argument))
           .map((value) => ({ value: `avatar ${value}`, label: value }));
         return matches.length > 0 ? matches : null;
@@ -49,6 +50,11 @@ export function registerIncarnateCommand(pi: ExtensionAPI, dependencies: Incarna
     },
     handler: async (args, ctx) => {
       const [subcommand = "", id, ...extra] = args.trim().split(/\s+/).filter(Boolean);
+
+      if (!subcommand) {
+        ctx.ui.notify(USAGE, "info");
+        return;
+      }
 
       if (subcommand === "list" && !id) {
         const { characters, issues } = await discoverCharacters(charactersRoot);
@@ -91,8 +97,8 @@ export function registerIncarnateCommand(pi: ExtensionAPI, dependencies: Incarna
         const active = state.activeCharacter;
         ctx.ui.notify(
           active
-            ? `Active character: ${active.name} (${active.id})\nMood: ${state.currentMood ?? "none"}\nAvatar: ${state.avatarEnabled ? "on" : "off"}\nForms: ${active.forms.filter((form) => form.status === "available").length}/${active.forms.length} available\nCard: ${active.cardPath}`
-            : `Character mode: off\nAvatar: ${state.avatarEnabled ? "on" : "off"}`,
+            ? `Active character: ${active.name} (${active.id})\nMood: ${state.currentMood ?? "none"}\nAvatar: ${state.avatarMode}\nForms: ${active.forms.filter((form) => form.status === "available").length}/${active.forms.length} available\nCard: ${active.cardPath}`
+            : `Character mode: off\nAvatar: ${state.avatarMode}`,
           "info",
         );
         return;
@@ -115,10 +121,16 @@ export function registerIncarnateCommand(pi: ExtensionAPI, dependencies: Incarna
         return;
       }
 
-      if (subcommand === "avatar" && (id === "on" || id === "off") && extra.length === 0) {
-        state.setAvatarEnabled(id === "on");
+      if (
+        subcommand === "avatar" &&
+        id &&
+        ["auto", "full", "compact", "off", "on"].includes(id) &&
+        extra.length === 0
+      ) {
+        const mode: AvatarMode = id === "on" ? "auto" : (id as AvatarMode);
+        state.setAvatarMode(mode);
         await onStateChange?.(ctx);
-        ctx.ui.notify(`Avatar: ${id}`, "info");
+        ctx.ui.notify(`Avatar: ${mode}`, "info");
         return;
       }
 

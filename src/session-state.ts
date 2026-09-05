@@ -1,15 +1,18 @@
 import type { Character } from "./character-loader.ts";
 
+export type AvatarMode = "auto" | "full" | "compact" | "off";
+
 export interface IncarnateStateSnapshot {
   activeCharacter?: Character;
   currentMood?: string;
+  avatarMode: AvatarMode;
   avatarEnabled: boolean;
 }
 
 export class IncarnateSessionState {
   #activeCharacter: Character | undefined;
   #currentMood: string | undefined;
-  #avatarEnabled = true;
+  #avatarMode: AvatarMode = "auto";
 
   get activeCharacter(): Character | undefined {
     return this.#activeCharacter;
@@ -20,7 +23,11 @@ export class IncarnateSessionState {
   }
 
   get avatarEnabled(): boolean {
-    return this.#avatarEnabled;
+    return this.#avatarMode !== "off";
+  }
+
+  get avatarMode(): AvatarMode {
+    return this.#avatarMode;
   }
 
   activate(character: Character): void {
@@ -41,19 +48,24 @@ export class IncarnateSessionState {
   }
 
   setAvatarEnabled(enabled: boolean): void {
-    this.#avatarEnabled = enabled;
+    this.#avatarMode = enabled ? "auto" : "off";
+  }
+
+  setAvatarMode(mode: AvatarMode): void {
+    this.#avatarMode = mode;
   }
 
   reset(): void {
     this.deactivate();
-    this.#avatarEnabled = true;
+    this.#avatarMode = "auto";
   }
 
   snapshot(): IncarnateStateSnapshot {
     return {
       activeCharacter: this.#activeCharacter,
       currentMood: this.#currentMood,
-      avatarEnabled: this.#avatarEnabled,
+      avatarMode: this.#avatarMode,
+      avatarEnabled: this.avatarEnabled,
     };
   }
 }

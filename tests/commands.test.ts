@@ -110,13 +110,32 @@ test("mood and avatar commands validate and refresh presentation state", async (
   await harness.command.handler("use mira", harness.context);
 
   await harness.command.handler("mood focused", harness.context);
+  await harness.command.handler("avatar full", harness.context);
+  assert.equal(harness.state.avatarMode, "full");
+
+  await harness.command.handler("avatar compact", harness.context);
+  assert.equal(harness.state.avatarMode, "compact");
+
   await harness.command.handler("avatar off", harness.context);
 
   assert.equal(harness.state.currentMood, "focused");
   assert.equal(harness.state.avatarEnabled, false);
-  assert.equal(harness.getUpdateCount(), 3);
+  assert.equal(harness.state.avatarMode, "off");
+
+  await harness.command.handler("avatar on", harness.context);
+  assert.equal(harness.state.avatarMode, "auto");
+  assert.equal(harness.getUpdateCount(), 6);
 
   await harness.command.handler("mood missing", harness.context);
   assert.equal(harness.state.currentMood, "focused");
   assert.equal(harness.notifications.at(-1)?.type, "error");
+});
+
+test("bare command shows usage as information", async (t) => {
+  const harness = setup(await fixture(t));
+
+  await harness.command.handler("", harness.context);
+
+  assert.equal(harness.notifications.at(-1)?.type, "info");
+  assert.match(harness.notifications.at(-1)?.message ?? "", /^Usage: \/incarnate/);
 });

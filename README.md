@@ -46,11 +46,11 @@ pi remove /home/revmsonwe/Projects/pi-incarnate
 /incarnate use <character-id>
 /incarnate status
 /incarnate mood <preset>
-/incarnate avatar on|off
+/incarnate avatar auto|full|compact|off
 /incarnate off
 ```
 
-角色、mood 和头像开关只对当前 Pi session 有效。`/new`、`/resume` 或 `/fork` 后角色模式会关闭，避免人格层意外影响另一段会话。角色切换会先完整加载新角色，失败时保留原状态。
+角色、mood 和头像模式只对当前 Pi session 有效。头像默认为 `auto`：宽终端显示靠右的完整 `avatar.txt`，窄终端只显示角色与 mood 状态行；`full` 和 `compact` 可手动固定模式，旧命令 `avatar on` 仍作为 `auto` 的别名。`/new`、`/resume` 或 `/fork` 后角色模式会关闭，避免人格层意外影响另一段会话。角色切换会先完整加载新角色，失败时保留原状态。
 
 仓库内置原创示例角色 `mira`：
 

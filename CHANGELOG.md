@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here.
 
+## Unreleased
+
+- Add responsive `auto`, `full`, and `compact` avatar display modes using the same `avatar.txt` asset.
+- Right-align the full avatar and collapse narrow terminals to a status-only widget.
+- Show normal usage help instead of an error for a bare `/incarnate` command.
+
 ## 0.1.0 - 2026-09-04
 
 Initial release.
