@@ -10,7 +10,7 @@ Pi extensions execute with the same system permissions as Pi. Review this packag
 - Character-card writes are validated before an atomic replacement, and copied character resources reject symbolic links and non-regular files.
 - Declared form paths must resolve to readable files inside their character directory.
 - Form contents are never loaded or cached by the extension itself.
-- ASCII avatars have terminal control sequences removed and are size-limited.
+- Plain avatars have terminal control sequences removed. ANSI avatars use a strict SGR color-only allowlist; cursor movement, screen control, OSC, hyperlinks, and other escape sequences are removed. Both formats are byte-, line-, and width-limited, with a forced reset on every ANSI line.
 - The personality layer is appended without replacing Pi's existing tool, permission, or safety instructions, and explicitly tells the model to preserve those boundaries.
 
 Do not include secrets in character cards or preference forms. A character can ask Pi to read an available declared form when relevant, so those files should contain only information you intend to expose to the active model.

@@ -93,7 +93,8 @@ pi remove /home/revmsonwe/Projects/pi-incarnate
 characters/
 └── my-character/
     ├── CHARACTER.md
-    ├── avatar.txt          # 可选
+    ├── avatar.txt          # 可选，纯文本头像
+    ├── avatar.ansi         # 可选，受限 ANSI 真彩头像；优先于 avatar.txt
     └── forms/              # 可选
 ```
 
@@ -140,7 +141,7 @@ Default: warm
 
 菜单保存角色卡前会执行与运行时相同的必需章节和 mood 校验。格式错误时保留原文件并显示原因；创建过程使用暂存目录，编辑过程使用同目录临时文件原子替换。
 
-`avatar.txt` 会去除 ANSI 和终端控制序列，tab 展开为空格，最多显示 12 行、每行 48 个终端列。头像损坏或不可读时只降级为角色状态行，不会关闭已经启用的人格。
+`avatar.txt` 是纯文本格式，会去除 ANSI 和终端控制序列。`avatar.ansi` 用于彩色头像，存在时优先于 `avatar.txt`；它只保留标准色、256 色、24-bit 前景/背景色及 reset，光标移动、清屏、OSC、超链接和其他控制序列一律删除。两种格式都要求 UTF-8，最大 64 KiB、16 行、每行 48 个终端列。ANSI 每行会强制 reset，防止颜色泄漏到 Pi 界面。头像损坏或不可读时只降级为角色状态行，不会关闭已经启用的人格。
 
 ## 故障排查
 
@@ -148,6 +149,7 @@ Default: warm
 - `missing required non-empty sections`：补齐四个必需的二级章节，并确保正文非空。
 - `Current Mood ...`：检查 `Default:`、三级标题 preset ID 和对应正文。
 - `Forms: n/m available`：运行 `/incarnate status` 后检查缺失文件；表单路径必须留在角色目录内。
+- 彩色头像不显示：文件名应为 `avatar.ansi` 并位于对应角色目录；任意 ANSI 动画、光标控制或终端命令不会被支持。
 - 命令没有出现：开发时确认使用 `pi -e ./extensions/index.ts`；本地安装后可用 `pi list` 和 `pi config` 检查资源状态。
 - 项目本地扩展未加载：Pi 只从受信任项目自动加载 `.pi/extensions`；本项目的显式 `-e` 和本地包安装不依赖该目录。
 

@@ -12,3 +12,5 @@ Every character directory must contain a UTF-8 `CHARACTER.md` with a level-one c
 - `Behavior`
 
 Optional sections such as `Tools and Forms` and `Current Mood` are preserved verbatim and become part of the persona prompt. Declared forms and mood presets are validated by their dedicated loaders.
+
+An optional `avatar.txt` provides a plain UTF-8 avatar. An optional `avatar.ansi` takes precedence and may use only safe SGR foreground/background colors and resets. Both formats are limited to 64 KiB, 16 lines, and 48 visible columns.
