@@ -77,7 +77,7 @@ pi remove /home/revmsonwe/Projects/pi-incarnate
 
 ## 编写角色卡
 
-推荐直接运行 `/incarnate`，选择 `Create character card`。依次输入角色 ID 和显示名后，Pi 会打开带完整结构的多行模板：`Enter` 保存，`Shift+Enter` 或 `Ctrl+J` 插入换行，`Ctrl+G` 可调用外部编辑器，`Esc` 取消且不写入文件。
+推荐直接运行 `/incarnate`，选择 `Create character card`。先输入支持中文的角色显示名，再确认仅用于目录和命令的安全 ID；ID 留空会采用自动建议值，大写字母、空格和下划线会规范化。随后 Pi 会打开带完整结构的多行模板：`Enter` 保存，`Shift+Enter` 或 `Ctrl+J` 插入换行，`Ctrl+G` 可调用外部编辑器，`Esc` 取消且不写入文件。
 
 个人角色保存在：
 

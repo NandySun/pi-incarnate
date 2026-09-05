@@ -9,6 +9,7 @@ All notable changes to this project are documented here.
 - Show normal usage help instead of an error when `/incarnate` is invoked without an interactive UI.
 - Turn bare `/incarnate` into a keyboard-navigable menu for character, mood, avatar, status, and disable actions.
 - Add guided character creation and editing with Pi's multiline editor, full validation, and atomic saves.
+- Ask for the display name first, suggest a safe character id, normalize common id formatting, and retry invalid input in place.
 - Store personal characters outside the npm package and let them override same-id built-in characters.
 
 ## 0.1.0 - 2026-09-04

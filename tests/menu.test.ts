@@ -76,7 +76,7 @@ test("keyboard menu creates, validates, stores, and activates a character", asyn
   const state = new IncarnateSessionState();
   const harness = context({
     selections: ["Create character card", "Close menu"],
-    inputs: ["nova", "Nova"],
+    inputs: ["Nova", "nova"],
     editorText: createCharacterTemplate("Nova"),
     confirm: true,
   });
@@ -85,6 +85,36 @@ test("keyboard menu creates, validates, stores, and activates a character", asyn
 
   assert.equal(state.activeCharacter?.id, "nova");
   assert.match(await readFile(join(locations.personalRoot, "nova", "CHARACTER.md"), "utf8"), /^# Nova/);
+});
+
+test("character creation accepts a Chinese name and an automatically suggested safe id", async (t) => {
+  const locations = await roots(t);
+  const state = new IncarnateSessionState();
+  const harness = context({
+    selections: ["Create character card", "Close menu"],
+    inputs: ["星澜", ""],
+    editorText: createCharacterTemplate("星澜"),
+  });
+
+  await openIncarnateMenu(harness.ctx, { locations, state });
+
+  assert.match(await readFile(join(locations.personalRoot, "character", "CHARACTER.md"), "utf8"), /^# 星澜/);
+});
+
+test("invalid character ids stay in the prompt and common formatting is normalized", async (t) => {
+  const locations = await roots(t);
+  const state = new IncarnateSessionState();
+  const harness = context({
+    selections: ["Create character card", "Close menu"],
+    inputs: ["Nova Prime", "角色", "Nova_Prime"],
+    editorText: createCharacterTemplate("Nova Prime"),
+  });
+
+  await openIncarnateMenu(harness.ctx, { locations, state });
+
+  assert.match(await readFile(join(locations.personalRoot, "nova-prime", "CHARACTER.md"), "utf8"), /^# Nova Prime/);
+  assert.ok(harness.notifications.some((message) => /name may be Chinese/.test(message)));
+  assert.ok(harness.notifications.some((message) => /normalized to: nova-prime/.test(message)));
 });
 
 test("keyboard menu changes mood and avatar mode without subcommands", async (t) => {

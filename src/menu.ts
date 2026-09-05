@@ -104,20 +104,49 @@ async function chooseAvatarMode(ctx: ExtensionCommandContext, dependencies: Inca
 async function promptForCharacterId(
   ctx: ExtensionCommandContext,
   locations: CharacterLocations,
+  name: string,
 ): Promise<string | undefined> {
-  const value = await ctx.ui.input("New character id", "lowercase letters, numbers, and hyphens");
-  if (value === undefined) return undefined;
-  const id = value.trim();
-  if (!isCharacterId(id)) {
-    ctx.ui.notify("Character id must use lowercase letters, numbers, and interior hyphens", "error");
-    return undefined;
-  }
   const { entries } = await discoverCharacterCatalog(locations);
-  if (entries.some((entry) => entry.character.id === id)) {
-    ctx.ui.notify(`Character already exists: ${id}. Choose Edit character card instead.`, "error");
-    return undefined;
+  const existingIds = new Set(entries.map((entry) => entry.character.id));
+  const normalizedName = name
+    .normalize("NFKD")
+    .toLowerCase()
+    .replace(/[’']/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  const base = isCharacterId(normalizedName) ? normalizedName : "character";
+  let suggestion = base;
+  let suffix = 2;
+  while (existingIds.has(suggestion)) suggestion = `${base}-${suffix++}`;
+
+  while (true) {
+    const value = await ctx.ui.input(`Character id · suggested: ${suggestion}`, "leave empty to use suggestion");
+    if (value === undefined) return undefined;
+    const raw = value.trim();
+    const id = raw
+      ? raw.toLowerCase().replace(/[\s_]+/g, "-").replace(/^-+|-+$/g, "")
+      : suggestion;
+    if (!isCharacterId(id)) {
+      ctx.ui.notify("Use English letters or numbers for the id; spaces become hyphens. The character name may be Chinese.", "error");
+      continue;
+    }
+    if (existingIds.has(id)) {
+      ctx.ui.notify(`Character already exists: ${id}. Choose Edit character card instead.`, "error");
+      continue;
+    }
+    if (raw && raw !== id) ctx.ui.notify(`Character id normalized to: ${id}`, "info");
+    return id;
   }
-  return id;
+}
+
+async function promptForCharacterName(ctx: ExtensionCommandContext): Promise<string | undefined> {
+  while (true) {
+    const value = await ctx.ui.input("Character name", "Chinese and other languages are supported");
+    if (value === undefined) return undefined;
+    const name = value.trim().replace(/[\r\n]+/g, " ");
+    if (name) return name;
+    ctx.ui.notify("Character name must not be empty", "error");
+  }
 }
 
 async function createCharacter(ctx: ExtensionCommandContext, dependencies: IncarnateMenuDependencies): Promise<void> {
@@ -126,15 +155,10 @@ async function createCharacter(ctx: ExtensionCommandContext, dependencies: Incar
     ctx.ui.notify("Personal character storage is not configured", "error");
     return;
   }
-  const id = await promptForCharacterId(ctx, dependencies.locations);
+  const name = await promptForCharacterName(ctx);
+  if (!name) return;
+  const id = await promptForCharacterId(ctx, dependencies.locations, name);
   if (!id) return;
-  const nameInput = await ctx.ui.input("Character name", "display name");
-  if (nameInput === undefined) return;
-  const name = nameInput.trim().replace(/[\r\n]+/g, " ");
-  if (!name) {
-    ctx.ui.notify("Character name must not be empty", "error");
-    return;
-  }
   const markdown = await ctx.ui.editor(`Create ${name} (${id})`, createCharacterTemplate(name));
   if (markdown === undefined) return;
   try {
