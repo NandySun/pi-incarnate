@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 
 ## 0.1.0 - 2026-09-04
 
-Initial release candidate.
+Initial release.
 
 - Add strict Markdown character discovery and loading.
 - Add session-scoped character activation and safe prompt injection.
