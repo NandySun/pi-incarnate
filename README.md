@@ -68,6 +68,8 @@ pi remove /home/revmsonwe/Projects/pi-incarnate
 
 角色、mood 和头像模式只对当前 Pi session 有效。头像默认为 `auto`：宽终端显示靠右的完整 `avatar.txt`，头像尾行与左侧角色状态同行；窄终端只显示角色与 mood 状态行。`full` 和 `compact` 可手动固定模式，旧命令 `avatar on` 仍作为 `auto` 的别名。`/new`、`/resume` 或 `/fork` 后角色模式会关闭，避免人格层意外影响另一段会话。角色切换会先完整加载新角色，失败时保留原状态。
 
+开发中的可选 `pi-incarnate-ui` 扩展可以通过版本化事件协议接管表现层，把角色图和会话信息放进 Pi 启动 Header。UI 接管后，本扩展会关闭原有常驻 widget；人格、命令、角色加载和 ANSI 安全边界仍由本扩展负责。未加载配套 UI 时行为不变。
+
 仓库内置原创示例角色 `mira`：
 
 ```text
