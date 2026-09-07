@@ -4,10 +4,10 @@ All notable changes to this project are documented here.
 
 ## Unreleased
 
-- Add responsive `auto`, `full`, and `compact` avatar display modes using the same `avatar.txt` asset.
-- Right-align the full avatar with its final line sharing the status row, and collapse narrow terminals to a status-only widget.
+- Move all on-screen avatar presentation to the optional `pi-incarnate-ui` companion; core now only publishes sanitized character presentation data.
+- Add `auto`, `full`, `compact`, and `off` presentation preferences for companion UIs, all using the same avatar asset.
 - Add `avatar.ansi` support with a strict SGR color allowlist, per-line resets, a 64 KiB limit, and a 16-line display limit.
-- Add a versioned, read-only UI state protocol so an optional Header extension can claim presentation without duplicating character or ANSI parsing.
+- Add a versioned, read-only UI state protocol so companion extensions can render presentation without duplicating character or ANSI parsing.
 - Show normal usage help instead of an error when `/incarnate` is invoked without an interactive UI.
 - Turn bare `/incarnate` into a keyboard-navigable menu for character, mood, avatar, status, and disable actions.
 - Add guided character creation and editing with Pi's multiline editor, full validation, and atomic saves.

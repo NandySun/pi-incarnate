@@ -11,8 +11,6 @@ import {
   AVATAR_MAX_BYTES,
   AvatarLoadError,
   loadAvatar,
-  renderAvatarWidget,
-  resolveAvatarMode,
   sanitizeAnsiAvatar,
   sanitizeAvatar,
 } from "../src/avatar.ts";
@@ -32,8 +30,6 @@ const character = {
   mood: { presets: new Map() },
   forms: [],
 } as unknown as Character;
-
-const avatar = sanitizeAvatar(" /\\_/\\\n( o.o )\n > ^ <");
 
 test("removes terminal control sequences and expands tabs", () => {
   const avatar = sanitizeAvatar("\u001b[31mred\u001b[0m\tface\u0007");
@@ -92,36 +88,4 @@ test("loadAvatar rejects oversized avatar files", async (t) => {
   await writeFile(join(target.directory, "avatar.ansi"), Buffer.alloc(AVATAR_MAX_BYTES + 1, 32));
 
   await assert.rejects(loadAvatar(target), AvatarLoadError);
-});
-
-test("compact mode renders only the status header", () => {
-  assert.deepEqual(renderAvatarWidget(character, "warm", avatar, 100, "compact"), [
-    "pi-incarnate · 弥拉 · mood: warm",
-  ]);
-});
-
-test("auto mode uses the full right-aligned avatar when enough width is available", () => {
-  const lines = renderAvatarWidget(character, "warm", avatar, 100, "auto");
-
-  assert.equal(resolveAvatarMode("auto", 100, "pi-incarnate · 弥拉 · mood: warm", avatar), "full");
-  assert.equal(lines.length, avatar.lines.length);
-  assert.match(lines[0] ?? "", /^\s+ \/\\_\/\\$/);
-  assert.match(lines.at(-1) ?? "", /^pi-incarnate · 弥拉 · mood: warm\s+ > \^ <$/);
-  assert.ok(lines.every((line) => visibleWidth(line) <= 100));
-  assert.ok(lines.every((line) => visibleWidth(line) === 100));
-});
-
-test("auto mode collapses to the status header in a narrow terminal", () => {
-  const lines = renderAvatarWidget(character, "warm", avatar, 60, "auto");
-
-  assert.equal(resolveAvatarMode("auto", 60, lines[0] ?? "", avatar), "compact");
-  assert.deepEqual(lines, ["pi-incarnate · 弥拉 · mood: warm"]);
-});
-
-test("forced full mode stays within the supplied terminal width", () => {
-  const lines = renderAvatarWidget(character, "warm", avatar, 18, "full");
-
-  assert.equal(lines.length, avatar.lines.length + 1);
-  assert.ok(lines.every((line) => visibleWidth(line) <= 18));
-  assert.match(lines.at(-1) ?? "", /^pi-incarnate/);
 });

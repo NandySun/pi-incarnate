@@ -7,11 +7,11 @@ import { IncarnateSessionState } from "../src/session-state.ts";
 import { createUiStateSnapshot, isUiProtocolV1 } from "../src/ui-protocol.ts";
 
 const character: Character = {
-  id: "seed",
-  name: "席德",
-  cardPath: "/personal/seed/CHARACTER.md",
-  directory: "/personal/seed",
-  markdown: "# 席德",
+  id: "example-character",
+  name: "Example Character",
+  cardPath: "/personal/example-character/CHARACTER.md",
+  directory: "/personal/example-character",
+  markdown: "# Example Character",
   sections: {
     Identity: "identity",
     Personality: "personality",
@@ -19,7 +19,7 @@ const character: Character = {
     Behavior: "behavior",
   },
   forms: [
-    { label: "available", declaredPath: "forms/a.md", status: "available", resolvedPath: "/personal/seed/forms/a.md" },
+    { label: "available", declaredPath: "forms/a.md", status: "available", resolvedPath: "/personal/example-character/forms/a.md" },
     { label: "missing", declaredPath: "forms/b.md", status: "missing", reason: "missing" },
   ],
   mood: { defaultPreset: "normal", presets: new Map([["normal", { id: "normal", instruction: "calm" }]]) },
@@ -28,7 +28,7 @@ const character: Character = {
 test("creates a bounded read-only UI snapshot for an active character", () => {
   const state = new IncarnateSessionState();
   state.activate(character);
-  const avatar = sanitizeAnsiAvatar("\u001b[31m席德\u001b[0m");
+  const avatar = sanitizeAnsiAvatar("\u001b[31mEXAMPLE\u001b[0m");
 
   const snapshot = createUiStateSnapshot(
     state,
@@ -39,7 +39,7 @@ test("creates a bounded read-only UI snapshot for an active character", () => {
   assert.equal(snapshot.active, true);
   assert.equal(snapshot.character?.source, "personal");
   assert.deepEqual(snapshot.character?.forms, { available: 1, total: 2 });
-  assert.equal(snapshot.avatar?.width, 4);
+  assert.equal(snapshot.avatar?.width, 7);
   assert.equal(snapshot.avatar?.height, 1);
   assert.match(snapshot.avatar?.lines[0] ?? "", /\u001b\[31m/);
   assert.equal("rawCard" in (snapshot.character ?? {}), false);

@@ -127,7 +127,7 @@ test("keyboard menu changes mood and avatar mode without subcommands", async (t)
       "Choose mood · normal",
       "normal · active",
       "Avatar mode · auto",
-      "Compact · status only",
+      "Compact · character status only",
       "Close menu",
     ],
   });

@@ -86,10 +86,10 @@ async function chooseMood(ctx: ExtensionCommandContext, dependencies: IncarnateM
 
 async function chooseAvatarMode(ctx: ExtensionCommandContext, dependencies: IncarnateMenuDependencies): Promise<void> {
   const options: Array<{ mode: AvatarMode; label: string }> = [
-    { mode: "auto", label: "Auto · responsive full/compact" },
-    { mode: "full", label: "Full · always show avatar" },
-    { mode: "compact", label: "Compact · status only" },
-    { mode: "off", label: "Off · hide widget" },
+    { mode: "auto", label: "Auto · responsive portrait/status" },
+    { mode: "full", label: "Full · prefer portrait preview" },
+    { mode: "compact", label: "Compact · character status only" },
+    { mode: "off", label: "Off · hide character UI" },
   ];
   const labels = options.map(({ mode, label }) => `${label}${mode === dependencies.state.avatarMode ? " · active" : ""}`);
   const selected = await ctx.ui.select("Avatar mode", [...labels, "← Back"]);

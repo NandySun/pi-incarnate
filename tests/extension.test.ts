@@ -8,9 +8,9 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 
 import incarnateExtension from "../extensions/index.ts";
-import { UI_CLAIM_EVENT, UI_STATE_EVENT, type IncarnateUiStateV1 } from "../src/ui-protocol.ts";
+import { UI_STATE_EVENT, type IncarnateUiStateV1 } from "../src/ui-protocol.ts";
 
-test("extension wires command state into prompt and widget lifecycle", async () => {
+test("extension wires command state into prompt and publishes presentation data", async () => {
   const handlers = new Map<string, (event: unknown, context: ExtensionCommandContext) => unknown>();
   const eventHandlers = new Map<string, Set<(data: unknown) => void>>();
   const events = {
@@ -40,13 +40,13 @@ test("extension wires command state into prompt and widget lifecycle", async () 
       };
     },
   } as unknown as ExtensionAPI;
-  const widgets: Array<string[] | undefined> = [];
+  let widgetCalls = 0;
   const context = {
     hasUI: true,
     ui: {
       notify() {},
-      setWidget(_key: string, content: string[] | undefined) {
-        widgets.push(content);
+      setWidget() {
+        widgetCalls += 1;
       },
     },
   } as unknown as ExtensionCommandContext;
@@ -65,12 +65,6 @@ test("extension wires command state into prompt and widget lifecycle", async () 
   assert.match(result.systemPrompt ?? "", /Active character: 弥拉 \(mira\)/);
   assert.match(result.systemPrompt ?? "", /Current mood preset: warm/);
   assert.match(result.systemPrompt ?? "", /3[^\n]*forms|游戏偏好:/i);
-  assert.match(widgets.at(-1)?.[0] ?? "", /弥拉 · mood: warm/);
   assert.equal(uiStates.at(-1)?.character?.name, "弥拉");
-
-  events.emit(UI_CLAIM_EVENT, { version: 1 });
-  assert.equal(widgets.at(-1), undefined);
-
-  await handlers.get("session_shutdown")?.({ type: "session_shutdown", reason: "quit" }, context);
-  assert.equal(widgets.at(-1), undefined);
+  assert.equal(widgetCalls, 0);
 });

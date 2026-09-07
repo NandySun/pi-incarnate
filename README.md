@@ -1,6 +1,6 @@
 # pi-incarnate
 
-让角色进入 Pi Agent 的对话现场：通过可编辑角色卡、稳定的人格层、会话内 mood 和持久 TUI ASCII 头像，让非 coding 对话拥有更强的在场感，同时保留 Pi 原有工具、安全边界和任务完成能力。
+让角色进入 Pi Agent 的对话现场：通过可编辑角色卡、稳定的人格层和会话内 mood，让非 coding 对话拥有更强的在场感，同时保留 Pi 原有工具、安全边界和任务完成能力。头像与状态显示由可选的 `pi-incarnate-ui` 配套扩展提供。
 
 最新 npm 版本为 `0.1.0`；当前 `main` 包含尚未发布的交互菜单和角色卡编辑功能。项目已在 Pi `0.85.0` 验证，要求 Node.js `>=22.19.0`。第一版不做世界书、自动长期记忆或隐式角色切换。
 
@@ -22,7 +22,7 @@ pi -e ./extensions/index.ts
 把当前工作区作为本地 Pi 包安装：
 
 ```bash
-pi install /home/revmsonwe/Projects/pi-incarnate
+pi install /path/to/pi-incarnate
 ```
 
 从 npm registry 安装正式版本：
@@ -36,7 +36,7 @@ pi install npm:pi-incarnate
 本地包由 Pi 设置管理；需要移除时运行：
 
 ```bash
-pi remove /home/revmsonwe/Projects/pi-incarnate
+pi remove /path/to/pi-incarnate
 ```
 
 ## 命令
@@ -66,9 +66,9 @@ pi remove /home/revmsonwe/Projects/pi-incarnate
 /incarnate off
 ```
 
-角色、mood 和头像模式只对当前 Pi session 有效。头像默认为 `auto`：宽终端显示靠右的完整 `avatar.txt`，头像尾行与左侧角色状态同行；窄终端只显示角色与 mood 状态行。`full` 和 `compact` 可手动固定模式，旧命令 `avatar on` 仍作为 `auto` 的别名。`/new`、`/resume` 或 `/fork` 后角色模式会关闭，避免人格层意外影响另一段会话。角色切换会先完整加载新角色，失败时保留原状态。
+角色、mood 和头像模式只对当前 Pi session 有效。核心扩展负责发现并安全清理头像资源，通过版本化事件协议交给可选的 `pi-incarnate-ui`；实际 Header、widget 和 footer 显示完全由 UI 扩展负责。未安装 UI 时人格功能仍然正常，只是不显示头像。`/new`、`/resume` 或 `/fork` 后角色模式会关闭，避免人格层意外影响另一段会话。角色切换会先完整加载新角色，失败时保留原状态。
 
-开发中的可选 `pi-incarnate-ui` 扩展可以通过版本化事件协议接管表现层，把角色图和会话信息放进 Pi 启动 Header。UI 接管后，本扩展会关闭原有常驻 widget；人格、命令、角色加载和 ANSI 安全边界仍由本扩展负责。未加载配套 UI 时行为不变。
+可选的 `pi-incarnate-ui` 扩展通过版本化事件协议接收只读表现数据，并在 Pi 底部提供不超过 6 行的固定 Footer。人格、命令、角色加载和 ANSI 安全边界仍由本扩展负责；核心扩展不再绘制 Header、widget 或 Footer，因此未安装配套 UI 时不会占用界面空间。
 
 仓库内置原创示例角色 `mira`：
 
@@ -166,7 +166,7 @@ src/session-state.ts      当前 session 的角色/mood/avatar 状态
 src/persona.ts            有界人格 prompt 组合
 src/commands.ts           /incarnate 命令
 src/menu.ts               键盘导航菜单与角色卡编辑流程
-src/avatar.ts             ASCII 清理、裁剪和 widget 内容
+src/avatar.ts             ASCII/ANSI 头像读取与安全清理
 src/mood.ts               mood 预设解析和 prompt 片段
 src/forms.ts              表单声明解析与路径边界校验
 characters/mira/          原创示例角色与三份空白表单
@@ -180,12 +180,3 @@ npm run release:check
 ```
 
 项目采用 [MIT License](./LICENSE)。版本变化记录见 [CHANGELOG.md](./CHANGELOG.md)，安全边界与报告方式见 [SECURITY.md](./SECURITY.md)。
-
-## 项目文档
-
-- [项目开发方向](</home/revmsonwe/Documents/Obsidian Vault/Projects/pi-incarnate/项目开发方向.md>)
-- [开发流程](</home/revmsonwe/Documents/Obsidian Vault/Projects/pi-incarnate/开发流程.md>)
-- [架构决策记录](</home/revmsonwe/Documents/Obsidian Vault/Projects/pi-incarnate/架构决策记录.md>)
-- [任务看板](</home/revmsonwe/Documents/Obsidian Vault/Projects/pi-incarnate/任务看板.md>)
-- [验证清单](</home/revmsonwe/Documents/Obsidian Vault/Projects/pi-incarnate/验证清单.md>)
-- [会话记录](</home/revmsonwe/Documents/Obsidian Vault/Projects/pi-incarnate/会话记录.md>)
