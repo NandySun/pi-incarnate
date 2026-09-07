@@ -119,3 +119,17 @@ test("rejects symbolic-link character directories", async (t) => {
     (error: unknown) => error instanceof CharacterLoadError && error.code === "invalid-directory",
   );
 });
+
+test("rejects symbolic-link character cards before reading them", async (t) => {
+  const root = await makeCharactersRoot(t);
+  const external = join(tmpdir(), `pi-incarnate-external-${crypto.randomUUID()}.md`);
+  await writeFile(external, VALID_CARD);
+  t.after(() => rm(external, { force: true }));
+  await mkdir(join(root, "linked-card"));
+  await symlink(external, join(root, "linked-card", "CHARACTER.md"));
+
+  await assert.rejects(
+    loadCharacter(root, "linked-card"),
+    (error: unknown) => error instanceof CharacterLoadError && error.code === "outside-root",
+  );
+});

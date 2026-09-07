@@ -5,7 +5,7 @@ Pi extensions execute with the same system permissions as Pi. Review this packag
 `pi-incarnate` applies these local boundaries:
 
 - Character IDs cannot contain path separators or traversal segments.
-- Character directories cannot be symbolic links.
+- Character directories and `CHARACTER.md` files cannot be symbolic links.
 - Built-in package characters are never edited in place; menu edits create a personal override under the Pi configuration directory.
 - Character-card writes are validated before an atomic replacement, and copied character resources reject symbolic links and non-regular files.
 - Declared form paths must resolve to readable files inside their character directory.

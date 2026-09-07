@@ -13,6 +13,8 @@ All notable changes to this project are documented here.
 - Add guided character creation and editing with Pi's multiline editor, full validation, and atomic saves.
 - Ask for the display name first, suggest a safe character id, normalize common id formatting, and retry invalid input in place.
 - Store personal characters outside the npm package and let them override same-id built-in characters.
+- Add a keyboard-driven repair flow for malformed or missing personal `CHARACTER.md` files, with the same validation and atomic-save guarantees as normal edits.
+- Reject symbolic-link `CHARACTER.md` files before reading them.
 
 ## 0.1.0 - 2026-09-04
 

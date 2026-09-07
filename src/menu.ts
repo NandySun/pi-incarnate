@@ -13,9 +13,10 @@ import {
   createPersonalOverride,
   isPersonalCharacter,
   readCharacterCard,
+  readPersonalCharacterDraft,
   updatePersonalCharacter,
 } from "./character-editor.ts";
-import { isCharacterId, type Character } from "./character-loader.ts";
+import { discoverCharacters, isCharacterId, type Character, type CharacterIssue } from "./character-loader.ts";
 import type { AvatarMode, IncarnateSessionState } from "./session-state.ts";
 
 export interface IncarnateMenuDependencies {
@@ -24,7 +25,7 @@ export interface IncarnateMenuDependencies {
   onStateChange?: (ctx: ExtensionCommandContext) => Promise<void> | void;
 }
 
-type MainAction = "character" | "mood" | "avatar" | "create" | "edit" | "status" | "off" | "close";
+type MainAction = "character" | "mood" | "avatar" | "create" | "edit" | "repair" | "status" | "off" | "close";
 
 const SOURCE_LABELS = { personal: "personal", "built-in": "built-in" } as const;
 
@@ -211,6 +212,45 @@ async function editCharacter(ctx: ExtensionCommandContext, dependencies: Incarna
   }
 }
 
+function repairableIssue(issue: CharacterIssue): boolean {
+  return issue.code === "invalid-card" || issue.code === "missing-card";
+}
+
+async function repairCharacter(ctx: ExtensionCommandContext, dependencies: IncarnateMenuDependencies): Promise<void> {
+  const personalRoot = dependencies.locations.personalRoot;
+  if (!personalRoot) {
+    ctx.ui.notify("Personal character storage is not configured", "error");
+    return;
+  }
+  const issues = (await discoverCharacters(personalRoot)).issues.filter(repairableIssue);
+  if (issues.length === 0) {
+    ctx.ui.notify("No repairable personal character cards found", "info");
+    return;
+  }
+
+  const labels = issues.map((issue) => `${issue.id} · ${issue.code}`);
+  const selected = await ctx.ui.select("Repair character card", [...labels, "← Back"]);
+  if (!selected || selected === "← Back") return;
+  const issue = issues[labels.indexOf(selected)];
+  if (!issue) return;
+
+  try {
+    const current = issue.code === "missing-card"
+      ? createCharacterTemplate(issue.id)
+      : await readPersonalCharacterDraft(personalRoot, issue.id);
+    const markdown = await ctx.ui.editor(`Repair ${issue.id} · ${issue.code}`, current);
+    if (markdown === undefined || (issue.code !== "missing-card" && markdown === current)) return;
+    const character = await updatePersonalCharacter(personalRoot, issue.id, markdown);
+    if (dependencies.state.activeCharacter?.id === character.id) {
+      dependencies.state.activate(character);
+      await dependencies.onStateChange?.(ctx);
+    }
+    ctx.ui.notify(`Character card repaired: ${character.name}\n${character.cardPath}`, "info");
+  } catch (error) {
+    ctx.ui.notify(errorMessage(error, "Failed to repair character"), "error");
+  }
+}
+
 function mainActions(state: IncarnateSessionState): Array<{ action: MainAction; label: string }> {
   const active = state.activeCharacter;
   return [
@@ -219,6 +259,7 @@ function mainActions(state: IncarnateSessionState): Array<{ action: MainAction; 
     { action: "avatar", label: `Avatar mode · ${state.avatarMode}` },
     { action: "create", label: "Create character card" },
     { action: "edit", label: "Edit character card" },
+    { action: "repair", label: "Repair invalid character card" },
     { action: "status", label: "Show status" },
     { action: "off", label: "Disable active character" },
     { action: "close", label: "Close menu" },
@@ -240,6 +281,7 @@ export async function openIncarnateMenu(
     if (action === "avatar") await chooseAvatarMode(ctx, dependencies);
     if (action === "create") await createCharacter(ctx, dependencies);
     if (action === "edit") await editCharacter(ctx, dependencies);
+    if (action === "repair") await repairCharacter(ctx, dependencies);
     if (action === "status") ctx.ui.notify(statusText(dependencies.state, dependencies.locations), "info");
     if (action === "off") {
       const previous = dependencies.state.activeCharacter;

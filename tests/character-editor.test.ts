@@ -9,6 +9,7 @@ import {
   createCharacterTemplate,
   createPersonalCharacter,
   createPersonalOverride,
+  readPersonalCharacterDraft,
   updatePersonalCharacter,
 } from "../src/character-editor.ts";
 import { loadCharacter } from "../src/character-loader.ts";
@@ -44,6 +45,20 @@ test("invalid edits leave the existing card unchanged", async (t) => {
   );
 
   assert.equal(await readFile(character.cardPath, "utf8"), original);
+});
+
+test("reads and atomically repairs an invalid personal character draft", async (t) => {
+  const { personalRoot } = await workspace(t);
+  const directory = join(personalRoot, "broken");
+  const invalid = "# Broken\n\n## Identity\nOnly one section.\n";
+  await mkdir(directory, { recursive: true });
+  await writeFile(join(directory, "CHARACTER.md"), invalid);
+
+  assert.equal(await readPersonalCharacterDraft(personalRoot, "broken"), invalid);
+  const repaired = await updatePersonalCharacter(personalRoot, "broken", createCharacterTemplate("Repaired"));
+
+  assert.equal(repaired.name, "Repaired");
+  assert.equal(await readFile(repaired.cardPath, "utf8"), createCharacterTemplate("Repaired"));
 });
 
 test("editing a built-in character creates a personal override and preserves resources", async (t) => {

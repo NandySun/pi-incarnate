@@ -152,3 +152,37 @@ test("editing a built-in card through the menu creates a personal override", asy
   assert.match(await readFile(join(locations.personalRoot, "mira", "CHARACTER.md"), "utf8"), /^# Personal Mira/);
   assert.match(harness.notifications.at(-1) ?? "", /Character card saved: Personal Mira/);
 });
+
+test("keyboard menu repairs a personal card that disappeared from the valid catalog", async (t) => {
+  const locations = await roots(t);
+  const brokenDirectory = join(locations.personalRoot, "broken");
+  await mkdir(brokenDirectory, { recursive: true });
+  await writeFile(join(brokenDirectory, "CHARACTER.md"), "# Broken\n\n## Identity\nOnly one section.\n");
+  const state = new IncarnateSessionState();
+  const harness = context({
+    selections: ["Repair invalid character card", "broken · invalid-card", "Close menu"],
+    editorText: createCharacterTemplate("Repaired Character"),
+  });
+
+  await openIncarnateMenu(harness.ctx, { locations, state });
+
+  assert.match(await readFile(join(brokenDirectory, "CHARACTER.md"), "utf8"), /^# Repaired Character/);
+  assert.match(harness.notifications.at(-1) ?? "", /Character card repaired: Repaired Character/);
+});
+
+test("keyboard menu can create a missing card from the unchanged repair template", async (t) => {
+  const locations = await roots(t);
+  const missingDirectory = join(locations.personalRoot, "missing-card");
+  await mkdir(missingDirectory, { recursive: true });
+  const state = new IncarnateSessionState();
+  const template = createCharacterTemplate("missing-card");
+  const harness = context({
+    selections: ["Repair invalid character card", "missing-card · missing-card", "Close menu"],
+    editorText: template,
+  });
+
+  await openIncarnateMenu(harness.ctx, { locations, state });
+
+  assert.equal(await readFile(join(missingDirectory, "CHARACTER.md"), "utf8"), template);
+  assert.match(harness.notifications.at(-1) ?? "", /Character card repaired: missing-card/);
+});

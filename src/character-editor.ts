@@ -149,6 +149,27 @@ export async function updatePersonalCharacter(
   return await loadCharacter(personalRoot, id);
 }
 
+export async function readPersonalCharacterDraft(personalRoot: string, id: string): Promise<string> {
+  const directory = await resolvePersonalDirectory(personalRoot, id);
+  const cardPath = join(directory, "CHARACTER.md");
+  let buffer: Buffer;
+  try {
+    const cardInfo = await lstat(cardPath);
+    if (!cardInfo.isFile() || cardInfo.isSymbolicLink()) {
+      throw new CharacterEditError(`Personal CHARACTER.md must be a regular file: ${id}`);
+    }
+    buffer = await readFile(cardPath);
+  } catch (error) {
+    if (error instanceof CharacterEditError) throw error;
+    throw new CharacterEditError(`Cannot read personal character card: ${id}`);
+  }
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(buffer);
+  } catch {
+    throw new CharacterEditError(`CHARACTER.md is not valid UTF-8: ${cardPath}`);
+  }
+}
+
 export async function createPersonalOverride(
   personalRoot: string,
   source: Character,

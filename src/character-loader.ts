@@ -143,18 +143,30 @@ export async function loadCharacter(charactersRoot: string, id: string): Promise
   }
 
   const cardPath = join(characterDirectory, "CHARACTER.md");
+  let canonicalCardPath: string;
   try {
     if (!(await stat(characterDirectory)).isDirectory()) {
       throw new CharacterLoadError("invalid-directory", `Character path is not a directory: ${id}`, characterDirectory);
     }
+    const cardInfo = await lstat(cardPath);
+    if (!cardInfo.isFile() || cardInfo.isSymbolicLink()) {
+      throw new CharacterLoadError("outside-root", `CHARACTER.md must be a regular file: ${id}`, cardPath);
+    }
+    canonicalCardPath = await realpath(cardPath);
+    if (!isWithin(characterDirectory, canonicalCardPath) || dirname(canonicalCardPath) !== characterDirectory) {
+      throw new CharacterLoadError("outside-root", `CHARACTER.md escapes the character directory: ${id}`, cardPath);
+    }
   } catch (error) {
     if (error instanceof CharacterLoadError) throw error;
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new CharacterLoadError("missing-card", `Missing or unreadable CHARACTER.md for: ${id}`, cardPath);
+    }
     throw new CharacterLoadError("unreadable", `Cannot inspect character directory: ${id}`, characterDirectory);
   }
 
   let buffer: Buffer;
   try {
-    buffer = await readFile(cardPath);
+    buffer = await readFile(canonicalCardPath);
   } catch {
     throw new CharacterLoadError("missing-card", `Missing or unreadable CHARACTER.md for: ${id}`, cardPath);
   }
