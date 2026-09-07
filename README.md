@@ -53,6 +53,7 @@ pi remove /path/to/pi-incarnate
 - 切换当前角色的 mood。
 - 切换头像的 `auto`、`full`、`compact`、`off` 模式。
 - 为角色导入或移除 `.ansi` / `.txt` 头像文件。
+- 查看、创建或编辑角色卡已经声明的 Markdown 偏好表单。
 - 查看当前状态。
 - 创建新角色卡，或编辑已有角色卡。
 - 修复因格式错误或缺少 `CHARACTER.md` 而从正常列表消失的个人角色。
@@ -141,7 +142,9 @@ Default: warm
 - 影视偏好：`forms/films.md`
 ```
 
-扩展只解析这些显式列表项并检查路径，不读取、不复制、不缓存表单内容。绝对路径、`..` 穿越、目录以及解析到角色目录外的符号链接都会被标为无效。
+扩展在正常角色加载和人格注入时只解析这些显式列表项并检查路径，不读取或缓存表单正文。绝对路径、`..` 穿越、目录以及解析到角色目录外的符号链接都会被标为无效。
+
+运行 `/incarnate` 并选择 `Manage preference forms`，可以打开已经声明且可用的 `.md` 表单，或从模板创建尚不存在的表单。只有用户明确选择编辑时才读取正文；编辑器限制为 256 KiB、有效 UTF-8、普通文件和角色目录内路径。编辑内置角色表单时会先创建个人覆盖副本，原包文件保持不变。新增表单声明仍通过 `Edit character card` 修改 `Tools and Forms` 章节。
 
 菜单保存角色卡前会执行与运行时相同的必需章节和 mood 校验。格式错误时保留原文件并显示原因；创建过程使用暂存目录，编辑过程使用同目录临时文件原子替换。
 
@@ -177,6 +180,7 @@ src/commands.ts           /incarnate 命令
 src/menu.ts               键盘导航菜单与角色卡编辑流程
 src/avatar.ts             ASCII/ANSI 头像读取与安全清理
 src/avatar-manager.ts     头像路径解析、安全导入与移除
+src/form-editor.ts        偏好表单有界读取与原子编辑
 src/mood.ts               mood 预设解析和 prompt 片段
 src/forms.ts              表单声明解析与路径边界校验
 characters/mira/          原创示例角色与三份空白表单

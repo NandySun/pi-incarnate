@@ -16,6 +16,7 @@ All notable changes to this project are documented here.
 - Add a keyboard-driven repair flow for malformed or missing personal `CHARACTER.md` files, with the same validation and atomic-save guarantees as normal edits.
 - Reject symbolic-link `CHARACTER.md` files before reading them.
 - Add keyboard-driven avatar import and removal for personal characters, including safe path normalization, ANSI sanitization, lossless bounds checks, and built-in character overrides.
+- Add explicit TUI creation and editing for declared Markdown preference forms, with bounded UTF-8 reads, atomic writes, path containment, and built-in character overrides.
 
 ## 0.1.0 - 2026-09-04
 

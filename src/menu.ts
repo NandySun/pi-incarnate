@@ -23,7 +23,8 @@ import {
   readPersonalCharacterDraft,
   updatePersonalCharacter,
 } from "./character-editor.ts";
-import { discoverCharacters, isCharacterId, type Character, type CharacterIssue } from "./character-loader.ts";
+import { readFormDraft, savePersonalForm } from "./form-editor.ts";
+import { discoverCharacters, isCharacterId, loadCharacter, type Character, type CharacterIssue } from "./character-loader.ts";
 import type { AvatarMode, IncarnateSessionState } from "./session-state.ts";
 
 export interface IncarnateMenuDependencies {
@@ -32,7 +33,7 @@ export interface IncarnateMenuDependencies {
   onStateChange?: (ctx: ExtensionCommandContext) => Promise<void> | void;
 }
 
-type MainAction = "character" | "mood" | "avatar" | "avatar-file" | "create" | "edit" | "repair" | "status" | "off" | "close";
+type MainAction = "character" | "mood" | "avatar" | "avatar-file" | "forms" | "create" | "edit" | "repair" | "status" | "off" | "close";
 
 const SOURCE_LABELS = { personal: "personal", "built-in": "built-in" } as const;
 
@@ -326,6 +327,54 @@ async function manageAvatarFile(ctx: ExtensionCommandContext, dependencies: Inca
   }
 }
 
+async function manageForms(ctx: ExtensionCommandContext, dependencies: IncarnateMenuDependencies): Promise<void> {
+  const personalRoot = dependencies.locations.personalRoot;
+  if (!personalRoot) {
+    ctx.ui.notify("Personal character storage is not configured", "error");
+    return;
+  }
+  const selected = await chooseCharacter(ctx, dependencies.locations, "Manage preference forms");
+  if (!selected) return;
+  if (selected.character.forms.length === 0) {
+    ctx.ui.notify("No forms declared. Add a Tools and Forms section to the character card first.", "info");
+    return;
+  }
+  const labels = selected.character.forms.map(
+    (form, index) => `${index + 1}. ${form.label} · ${form.status} · ${form.declaredPath}`,
+  );
+  const choice = await ctx.ui.select(`Preference forms · ${selected.character.name}`, [...labels, "← Back"]);
+  if (!choice || choice === "← Back") return;
+  const form = selected.character.forms[labels.indexOf(choice)];
+  if (!form) return;
+  if (form.status === "invalid") {
+    ctx.ui.notify(`Cannot edit invalid form: ${form.reason ?? form.declaredPath}`, "error");
+    return;
+  }
+
+  try {
+    if (selected.source === "built-in") {
+      const confirmed = await ctx.ui.confirm(
+        "Create personal copy?",
+        `${selected.character.name} is built in. Form changes require a personal override that survives package updates.`,
+      );
+      if (!confirmed) return;
+    }
+    const draft = await readFormDraft(selected.character.directory, form.declaredPath, form.label);
+    const content = await ctx.ui.editor(`Edit form · ${form.label}`, draft.content);
+    if (content === undefined || (draft.exists && content === draft.content)) return;
+
+    const character = selected.source === "personal"
+      ? selected.character
+      : await createPersonalOverride(personalRoot, selected.character, await readCharacterCard(selected.character));
+    const targetPath = await savePersonalForm(personalRoot, character.id, form.declaredPath, content);
+    const refreshed = await loadCharacter(personalRoot, character.id);
+    await refreshEditedCharacter(ctx, dependencies, refreshed);
+    ctx.ui.notify(`Preference form saved: ${form.label}\n${targetPath}`, "info");
+  } catch (error) {
+    ctx.ui.notify(errorMessage(error, "Failed to edit preference form"), "error");
+  }
+}
+
 function mainActions(state: IncarnateSessionState): Array<{ action: MainAction; label: string }> {
   const active = state.activeCharacter;
   return [
@@ -333,6 +382,7 @@ function mainActions(state: IncarnateSessionState): Array<{ action: MainAction; 
     { action: "mood", label: `Choose mood${state.currentMood ? ` · ${state.currentMood}` : ""}` },
     { action: "avatar", label: `Avatar mode · ${state.avatarMode}` },
     { action: "avatar-file", label: "Manage character avatar" },
+    { action: "forms", label: "Manage preference forms" },
     { action: "create", label: "Create character card" },
     { action: "edit", label: "Edit character card" },
     { action: "repair", label: "Repair invalid character card" },
@@ -356,6 +406,7 @@ export async function openIncarnateMenu(
     if (action === "mood") await chooseMood(ctx, dependencies);
     if (action === "avatar") await chooseAvatarMode(ctx, dependencies);
     if (action === "avatar-file") await manageAvatarFile(ctx, dependencies);
+    if (action === "forms") await manageForms(ctx, dependencies);
     if (action === "create") await createCharacter(ctx, dependencies);
     if (action === "edit") await editCharacter(ctx, dependencies);
     if (action === "repair") await repairCharacter(ctx, dependencies);

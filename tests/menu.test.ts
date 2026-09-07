@@ -240,3 +240,62 @@ test("avatar changes create a personal override and refresh an active built-in c
   assert.match(await readFile(join(locations.personalRoot, "mira", "avatar.ansi"), "utf8"), /\u001b\[31mface/);
   assert.equal(refreshes, 1);
 });
+
+test("keyboard menu creates and activates a declared missing preference form", async (t) => {
+  const locations = await roots(t);
+  const novaCard = createCharacterTemplate("Nova").replace(
+    "## Current Mood",
+    "## Tools and Forms\n\n- Notes: `forms/notes.md`\n\n## Current Mood",
+  );
+  await mkdir(join(locations.personalRoot, "nova"), { recursive: true });
+  await writeFile(join(locations.personalRoot, "nova", "CHARACTER.md"), novaCard);
+  const state = new IncarnateSessionState();
+  state.activate(await loadCharacter(locations.personalRoot, "nova"));
+  const harness = context({
+    selections: [
+      "Manage preference forms",
+      "Nova (nova) · personal",
+      "1. Notes · missing · forms/notes.md",
+      "Close menu",
+    ],
+    editorText: "# Notes\n\nPrefers concise answers.\n",
+  });
+  let refreshes = 0;
+
+  await openIncarnateMenu(harness.ctx, {
+    locations,
+    state,
+    onStateChange: () => void (refreshes += 1),
+  });
+
+  assert.equal(await readFile(join(locations.personalRoot, "nova", "forms", "notes.md"), "utf8"), "# Notes\n\nPrefers concise answers.\n");
+  assert.equal(state.activeCharacter?.forms[0]?.status, "available");
+  assert.equal(refreshes, 1);
+});
+
+test("editing a built-in preference form creates a personal override", async (t) => {
+  const locations = await roots(t);
+  const cardPath = join(locations.builtInRoot, "mira", "CHARACTER.md");
+  await writeFile(
+    cardPath,
+    MIRA_CARD.replace("## Current Mood", "## Tools and Forms\n\n- Notes: `forms/notes.md`\n\n## Current Mood"),
+  );
+  await mkdir(join(locations.builtInRoot, "mira", "forms"));
+  await writeFile(join(locations.builtInRoot, "mira", "forms", "notes.md"), "# Notes\n\nBuilt in.\n");
+  const state = new IncarnateSessionState();
+  const harness = context({
+    selections: [
+      "Manage preference forms",
+      "Mira (mira) · built-in",
+      "1. Notes · available · forms/notes.md",
+      "Close menu",
+    ],
+    editorText: "# Notes\n\nPersonal.\n",
+    confirm: true,
+  });
+
+  await openIncarnateMenu(harness.ctx, { locations, state });
+
+  assert.equal(await readFile(join(locations.personalRoot, "mira", "forms", "notes.md"), "utf8"), "# Notes\n\nPersonal.\n");
+  assert.equal(await readFile(join(locations.builtInRoot, "mira", "forms", "notes.md"), "utf8"), "# Notes\n\nBuilt in.\n");
+});
