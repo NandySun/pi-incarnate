@@ -8,6 +8,7 @@ Pi extensions execute with the same system permissions as Pi. Review this packag
 - Character directories and `CHARACTER.md` files cannot be symbolic links.
 - Built-in package characters are never edited in place; menu edits create a personal override under the Pi configuration directory.
 - Character-card writes are validated before an atomic replacement, and copied character resources reject symbolic links and non-regular files.
+- Character lifecycle actions operate only on direct personal-character directories. Archive storage must be a real directory, moves refuse existing targets, and the menu exposes recovery instead of permanent deletion.
 - Declared form paths must resolve to readable files inside their character directory.
 - Form contents are not loaded or cached during character activation or prompt composition. They are read only after an explicit `Manage preference forms` action, with UTF-8, regular-file, path-containment, and 256 KiB editor bounds.
 - Plain avatars have terminal control sequences removed. ANSI avatars use a strict SGR color-only allowlist; cursor movement, screen control, OSC, hyperlinks, and other escape sequences are removed. Both formats are byte-, line-, and width-limited, with a forced reset on every ANSI line.

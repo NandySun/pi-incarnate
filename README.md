@@ -57,6 +57,7 @@ pi remove /path/to/pi-incarnate
 - 查看当前状态。
 - 创建新角色卡，或编辑已有角色卡。
 - 修复因格式错误或缺少 `CHARACTER.md` 而从正常列表消失的个人角色。
+- 重命名、归档或恢复个人角色；归档可恢复，不提供永久删除入口。
 
 主菜单只保留角色选择、mood、头像模式、状态、关闭角色和 `Manage character resources`。角色卡、头像文件与偏好表单操作收在资源子菜单中，避免功能增加后主菜单持续变长。
 
@@ -158,6 +159,14 @@ Default: warm
 
 菜单导入会把清理后的安全版本写入个人角色目录，并拒绝需要裁剪的资源，避免静默损失图像。导入一种格式会移除另一种格式，确保新头像立即生效；写入使用同目录临时文件替换。移除操作需要确认，只删除个人副本中的 `avatar.ansi` 和 `avatar.txt`。
 
+个人角色还可以通过 `/incarnate` → `Rename, archive, or restore` 管理生命周期。重命名只修改安全目录 ID，不改角色卡中的显示名；如果角色正在使用，会同步更新当前会话。归档会在确认后把完整角色目录移到：
+
+```text
+~/.pi/agent/pi-incarnate/archive/<character-id>/
+```
+
+设置了 `PI_CODING_AGENT_DIR` 时仍以该目录为基准。归档会保留角色卡、头像和表单，并在归档当前角色时关闭角色模式；恢复后可选择立即启用。为了避免覆盖数据，同一 ID 只能有一个归档副本，且目标个人角色已存在时不会恢复。内置角色是只读的，不会出现在重命名或归档列表中。本版本没有永久删除角色的菜单。
+
 ## 故障排查
 
 - `No valid characters found`：确认角色位于个人目录或包内 `characters/<id>/CHARACTER.md`，目录 ID 合法。
@@ -176,6 +185,7 @@ extensions/index.ts       Pi 扩展入口和生命周期
 src/character-loader.ts   角色发现、UTF-8 与章节验证
 src/character-catalog.ts  个人/内置角色合并与覆盖规则
 src/character-editor.ts   模板、校验、安全创建与原子保存
+src/character-lifecycle.ts 个人角色重命名、可恢复归档与恢复
 src/session-state.ts      当前 session 的角色/mood/avatar 状态
 src/persona.ts            有界人格 prompt 组合
 src/commands.ts           /incarnate 命令

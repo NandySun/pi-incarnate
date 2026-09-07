@@ -18,6 +18,7 @@ All notable changes to this project are documented here.
 - Add keyboard-driven avatar import and removal for personal characters, including safe path normalization, ANSI sanitization, lossless bounds checks, and built-in character overrides.
 - Add explicit TUI creation and editing for declared Markdown preference forms, with bounded UTF-8 reads, atomic writes, path containment, and built-in character overrides.
 - Group card, repair, avatar-file, and preference-form actions under a compact character-resources submenu.
+- Add personal-character rename plus recoverable archive and restore flows, with collision checks, active-session synchronization, and no permanent-delete action.
 
 ## 0.1.0 - 2026-09-04
 

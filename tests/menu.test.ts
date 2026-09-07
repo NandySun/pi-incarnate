@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test, type TestContext } from "node:test";
@@ -302,4 +302,86 @@ test("editing a built-in preference form creates a personal override", async (t)
 
   assert.equal(await readFile(join(locations.personalRoot, "mira", "forms", "notes.md"), "utf8"), "# Notes\n\nPersonal.\n");
   assert.equal(await readFile(join(locations.builtInRoot, "mira", "forms", "notes.md"), "utf8"), "# Notes\n\nBuilt in.\n");
+});
+
+test("character lifecycle menu renames an active personal character", async (t) => {
+  const locations = await roots(t);
+  await mkdir(join(locations.personalRoot, "nova"), { recursive: true });
+  await writeFile(join(locations.personalRoot, "nova", "CHARACTER.md"), createCharacterTemplate("Nova"));
+  const state = new IncarnateSessionState();
+  state.activate(await loadCharacter(locations.personalRoot, "nova"));
+  const harness = context({
+    selections: [
+      "Manage character resources",
+      "Rename, archive, or restore",
+      "Rename personal character",
+      "Nova (nova)",
+      "Close menu",
+    ],
+    inputs: ["Nova Prime"],
+    confirm: true,
+  });
+  let refreshes = 0;
+
+  await openIncarnateMenu(harness.ctx, { locations, state, onStateChange: () => void (refreshes += 1) });
+
+  assert.equal(state.activeCharacter?.id, "nova-prime");
+  assert.equal(refreshes, 1);
+  assert.match(await readFile(join(locations.personalRoot, "nova-prime", "CHARACTER.md"), "utf8"), /^# Nova/);
+});
+
+test("character lifecycle menu archives and restores without permanent deletion", async (t) => {
+  const locations = await roots(t);
+  await mkdir(join(locations.personalRoot, "nova"), { recursive: true });
+  await writeFile(join(locations.personalRoot, "nova", "CHARACTER.md"), createCharacterTemplate("Nova"));
+  const state = new IncarnateSessionState();
+  state.activate(await loadCharacter(locations.personalRoot, "nova"));
+  let refreshes = 0;
+  const archiveHarness = context({
+    selections: [
+      "Manage character resources",
+      "Rename, archive, or restore",
+      "Archive personal character",
+      "Nova (nova)",
+      "Close menu",
+    ],
+    confirm: true,
+  });
+  await openIncarnateMenu(archiveHarness.ctx, { locations, state, onStateChange: () => void (refreshes += 1) });
+
+  assert.equal(state.activeCharacter, undefined);
+  assert.equal(refreshes, 1);
+
+  const restoreHarness = context({
+    selections: [
+      "Manage character resources",
+      "Rename, archive, or restore",
+      "Restore archived character",
+      "Nova (nova)",
+      "Close menu",
+    ],
+    confirm: false,
+  });
+  await openIncarnateMenu(restoreHarness.ctx, { locations, state, onStateChange: () => void (refreshes += 1) });
+
+  assert.match(await readFile(join(locations.personalRoot, "nova", "CHARACTER.md"), "utf8"), /^# Nova/);
+  assert.equal(refreshes, 1);
+});
+
+test("restore menu reports an unsafe archive root without leaving the menu", async (t) => {
+  const locations = await roots(t);
+  await symlink(locations.builtInRoot, join(dirname(locations.personalRoot), "archive"));
+  const state = new IncarnateSessionState();
+  const harness = context({
+    selections: [
+      "Manage character resources",
+      "Rename, archive, or restore",
+      "Restore archived character",
+      "Close menu",
+    ],
+  });
+
+  await openIncarnateMenu(harness.ctx, { locations, state });
+
+  assert.ok(harness.notifications.some((message) => /must be a real directory/.test(message)));
 });

@@ -14,6 +14,12 @@ import {
   type CharacterLocations,
 } from "./character-catalog.ts";
 import {
+  archivePersonalCharacter,
+  discoverArchivedCharacters,
+  renamePersonalCharacter,
+  restoreArchivedCharacter,
+} from "./character-lifecycle.ts";
+import {
   CharacterEditError,
   createCharacterTemplate,
   createPersonalCharacter,
@@ -34,7 +40,8 @@ export interface IncarnateMenuDependencies {
 }
 
 type MainAction = "character" | "mood" | "avatar" | "manage" | "status" | "off" | "close";
-type ManageAction = "create" | "edit" | "repair" | "avatar-file" | "forms" | "back";
+type ManageAction = "create" | "edit" | "repair" | "avatar-file" | "forms" | "lifecycle" | "back";
+type LifecycleAction = "rename" | "archive" | "restore" | "back";
 
 const SOURCE_LABELS = { personal: "personal", "built-in": "built-in" } as const;
 
@@ -376,6 +383,126 @@ async function manageForms(ctx: ExtensionCommandContext, dependencies: Incarnate
   }
 }
 
+async function choosePersonalCharacter(
+  ctx: ExtensionCommandContext,
+  locations: CharacterLocations,
+  title: string,
+): Promise<Character | undefined> {
+  const { entries } = await discoverCharacterCatalog(locations);
+  const characters = entries.filter((entry) => entry.source === "personal").map((entry) => entry.character);
+  if (characters.length === 0) {
+    ctx.ui.notify("No personal characters found", "info");
+    return undefined;
+  }
+  const labels = characters.map((character) => `${character.name} (${character.id})`);
+  const selected = await ctx.ui.select(title, [...labels, "← Back"]);
+  if (!selected || selected === "← Back") return undefined;
+  return characters[labels.indexOf(selected)];
+}
+
+function normalizeCharacterId(value: string): string {
+  return value.trim().toLowerCase().replace(/[\s_]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+async function renameCharacter(ctx: ExtensionCommandContext, dependencies: IncarnateMenuDependencies): Promise<void> {
+  const personalRoot = dependencies.locations.personalRoot;
+  if (!personalRoot) return;
+  const character = await choosePersonalCharacter(ctx, dependencies.locations, "Rename personal character");
+  if (!character) return;
+  const input = await ctx.ui.input("New character id", "lowercase letters, numbers, and interior hyphens");
+  if (input === undefined) return;
+  const nextId = normalizeCharacterId(input);
+  if (!isCharacterId(nextId)) {
+    ctx.ui.notify("Invalid character id", "error");
+    return;
+  }
+  const { entries } = await discoverCharacterCatalog(dependencies.locations);
+  if (entries.some((entry) => entry.character.id === nextId && nextId !== character.id)) {
+    ctx.ui.notify(`Character id already exists: ${nextId}`, "error");
+    return;
+  }
+  if (!(await ctx.ui.confirm("Rename character?", `${character.id} → ${nextId}`))) return;
+  try {
+    const renamed = await renamePersonalCharacter(personalRoot, character.id, nextId);
+    if (dependencies.state.activeCharacter?.id === character.id) {
+      dependencies.state.activate(renamed);
+      await dependencies.onStateChange?.(ctx);
+    }
+    ctx.ui.notify(`Character renamed: ${renamed.name} (${renamed.id})`, "info");
+  } catch (error) {
+    ctx.ui.notify(errorMessage(error, "Failed to rename character"), "error");
+  }
+}
+
+async function archiveCharacter(ctx: ExtensionCommandContext, dependencies: IncarnateMenuDependencies): Promise<void> {
+  const personalRoot = dependencies.locations.personalRoot;
+  if (!personalRoot) return;
+  const character = await choosePersonalCharacter(ctx, dependencies.locations, "Archive personal character");
+  if (!character) return;
+  if (!(await ctx.ui.confirm("Archive character?", `${character.name} will leave the active character list but can be restored.`))) return;
+  try {
+    const target = await archivePersonalCharacter(personalRoot, character.id);
+    if (dependencies.state.activeCharacter?.id === character.id) {
+      dependencies.state.deactivate();
+      await dependencies.onStateChange?.(ctx);
+    }
+    ctx.ui.notify(`Character archived: ${character.name}\n${target}`, "info");
+  } catch (error) {
+    ctx.ui.notify(errorMessage(error, "Failed to archive character"), "error");
+  }
+}
+
+async function restoreCharacter(ctx: ExtensionCommandContext, dependencies: IncarnateMenuDependencies): Promise<void> {
+  const personalRoot = dependencies.locations.personalRoot;
+  if (!personalRoot) return;
+  let characters: Character[];
+  let issues: CharacterIssue[];
+  try {
+    ({ characters, issues } = await discoverArchivedCharacters(personalRoot));
+  } catch (error) {
+    ctx.ui.notify(errorMessage(error, "Failed to inspect character archive"), "error");
+    return;
+  }
+  if (characters.length === 0) {
+    ctx.ui.notify(issues.length > 0 ? "No valid archived characters found" : "Character archive is empty", "info");
+    return;
+  }
+  const labels = characters.map((character) => `${character.name} (${character.id})`);
+  const selected = await ctx.ui.select("Restore archived character", [...labels, "← Back"]);
+  if (!selected || selected === "← Back") return;
+  const archived = characters[labels.indexOf(selected)];
+  if (!archived) return;
+  try {
+    const restored = await restoreArchivedCharacter(personalRoot, archived.id);
+    ctx.ui.notify(`Character restored: ${restored.name} (${restored.id})`, "info");
+    if (await ctx.ui.confirm("Enable character?", `Use ${restored.name} in this session now?`)) {
+      dependencies.state.activate(restored);
+      await dependencies.onStateChange?.(ctx);
+    }
+  } catch (error) {
+    ctx.ui.notify(errorMessage(error, "Failed to restore character"), "error");
+  }
+}
+
+async function manageCharacterLifecycle(
+  ctx: ExtensionCommandContext,
+  dependencies: IncarnateMenuDependencies,
+): Promise<void> {
+  const options: Array<{ action: LifecycleAction; label: string }> = [
+    { action: "rename", label: "Rename personal character" },
+    { action: "archive", label: "Archive personal character" },
+    { action: "restore", label: "Restore archived character" },
+    { action: "back", label: "← Back" },
+  ];
+  const selected = await ctx.ui.select("Character lifecycle", options.map((option) => option.label));
+  if (!selected) return;
+  const action = options.find((option) => option.label === selected)?.action;
+  if (!action || action === "back") return;
+  if (action === "rename") await renameCharacter(ctx, dependencies);
+  if (action === "archive") await archiveCharacter(ctx, dependencies);
+  if (action === "restore") await restoreCharacter(ctx, dependencies);
+}
+
 async function manageCharacterResources(
   ctx: ExtensionCommandContext,
   dependencies: IncarnateMenuDependencies,
@@ -386,6 +513,7 @@ async function manageCharacterResources(
     { action: "repair", label: "Repair invalid character card" },
     { action: "avatar-file", label: "Manage character avatar" },
     { action: "forms", label: "Manage preference forms" },
+    { action: "lifecycle", label: "Rename, archive, or restore" },
     { action: "back", label: "← Main menu" },
   ];
   const selected = await ctx.ui.select("Character resources", options.map((option) => option.label));
@@ -397,6 +525,7 @@ async function manageCharacterResources(
   if (action === "repair") await repairCharacter(ctx, dependencies);
   if (action === "avatar-file") await manageAvatarFile(ctx, dependencies);
   if (action === "forms") await manageForms(ctx, dependencies);
+  if (action === "lifecycle") await manageCharacterLifecycle(ctx, dependencies);
 }
 
 function mainActions(state: IncarnateSessionState): Array<{ action: MainAction; label: string }> {
