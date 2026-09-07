@@ -33,7 +33,8 @@ export interface IncarnateMenuDependencies {
   onStateChange?: (ctx: ExtensionCommandContext) => Promise<void> | void;
 }
 
-type MainAction = "character" | "mood" | "avatar" | "avatar-file" | "forms" | "create" | "edit" | "repair" | "status" | "off" | "close";
+type MainAction = "character" | "mood" | "avatar" | "manage" | "status" | "off" | "close";
+type ManageAction = "create" | "edit" | "repair" | "avatar-file" | "forms" | "back";
 
 const SOURCE_LABELS = { personal: "personal", "built-in": "built-in" } as const;
 
@@ -375,17 +376,36 @@ async function manageForms(ctx: ExtensionCommandContext, dependencies: Incarnate
   }
 }
 
+async function manageCharacterResources(
+  ctx: ExtensionCommandContext,
+  dependencies: IncarnateMenuDependencies,
+): Promise<void> {
+  const options: Array<{ action: ManageAction; label: string }> = [
+    { action: "create", label: "Create character card" },
+    { action: "edit", label: "Edit character card" },
+    { action: "repair", label: "Repair invalid character card" },
+    { action: "avatar-file", label: "Manage character avatar" },
+    { action: "forms", label: "Manage preference forms" },
+    { action: "back", label: "← Main menu" },
+  ];
+  const selected = await ctx.ui.select("Character resources", options.map((option) => option.label));
+  if (!selected) return;
+  const action = options.find((option) => option.label === selected)?.action;
+  if (!action || action === "back") return;
+  if (action === "create") await createCharacter(ctx, dependencies);
+  if (action === "edit") await editCharacter(ctx, dependencies);
+  if (action === "repair") await repairCharacter(ctx, dependencies);
+  if (action === "avatar-file") await manageAvatarFile(ctx, dependencies);
+  if (action === "forms") await manageForms(ctx, dependencies);
+}
+
 function mainActions(state: IncarnateSessionState): Array<{ action: MainAction; label: string }> {
   const active = state.activeCharacter;
   return [
     { action: "character", label: `Choose character${active ? ` · ${active.name}` : ""}` },
     { action: "mood", label: `Choose mood${state.currentMood ? ` · ${state.currentMood}` : ""}` },
     { action: "avatar", label: `Avatar mode · ${state.avatarMode}` },
-    { action: "avatar-file", label: "Manage character avatar" },
-    { action: "forms", label: "Manage preference forms" },
-    { action: "create", label: "Create character card" },
-    { action: "edit", label: "Edit character card" },
-    { action: "repair", label: "Repair invalid character card" },
+    { action: "manage", label: "Manage character resources" },
     { action: "status", label: "Show status" },
     { action: "off", label: "Disable active character" },
     { action: "close", label: "Close menu" },
@@ -405,11 +425,7 @@ export async function openIncarnateMenu(
     if (action === "character") await switchCharacter(ctx, dependencies);
     if (action === "mood") await chooseMood(ctx, dependencies);
     if (action === "avatar") await chooseAvatarMode(ctx, dependencies);
-    if (action === "avatar-file") await manageAvatarFile(ctx, dependencies);
-    if (action === "forms") await manageForms(ctx, dependencies);
-    if (action === "create") await createCharacter(ctx, dependencies);
-    if (action === "edit") await editCharacter(ctx, dependencies);
-    if (action === "repair") await repairCharacter(ctx, dependencies);
+    if (action === "manage") await manageCharacterResources(ctx, dependencies);
     if (action === "status") ctx.ui.notify(statusText(dependencies.state, dependencies.locations), "info");
     if (action === "off") {
       const previous = dependencies.state.activeCharacter;

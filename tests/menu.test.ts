@@ -77,7 +77,7 @@ test("keyboard menu creates, validates, stores, and activates a character", asyn
   const locations = await roots(t);
   const state = new IncarnateSessionState();
   const harness = context({
-    selections: ["Create character card", "Close menu"],
+    selections: ["Manage character resources", "Create character card", "Close menu"],
     inputs: ["Nova", "nova"],
     editorText: createCharacterTemplate("Nova"),
     confirm: true,
@@ -93,7 +93,7 @@ test("character creation accepts a Chinese name and an automatically suggested s
   const locations = await roots(t);
   const state = new IncarnateSessionState();
   const harness = context({
-    selections: ["Create character card", "Close menu"],
+    selections: ["Manage character resources", "Create character card", "Close menu"],
     inputs: ["星澜", ""],
     editorText: createCharacterTemplate("星澜"),
   });
@@ -107,7 +107,7 @@ test("invalid character ids stay in the prompt and common formatting is normaliz
   const locations = await roots(t);
   const state = new IncarnateSessionState();
   const harness = context({
-    selections: ["Create character card", "Close menu"],
+    selections: ["Manage character resources", "Create character card", "Close menu"],
     inputs: ["Nova Prime", "角色", "Nova_Prime"],
     editorText: createCharacterTemplate("Nova Prime"),
   });
@@ -144,7 +144,7 @@ test("editing a built-in card through the menu creates a personal override", asy
   const locations = await roots(t);
   const state = new IncarnateSessionState();
   const harness = context({
-    selections: ["Edit character card", "Mira (mira) · built-in", "Close menu"],
+    selections: ["Manage character resources", "Edit character card", "Mira (mira) · built-in", "Close menu"],
     editorText: MIRA_CARD.replace("# Mira", "# Personal Mira"),
     confirm: true,
   });
@@ -162,7 +162,7 @@ test("keyboard menu repairs a personal card that disappeared from the valid cata
   await writeFile(join(brokenDirectory, "CHARACTER.md"), "# Broken\n\n## Identity\nOnly one section.\n");
   const state = new IncarnateSessionState();
   const harness = context({
-    selections: ["Repair invalid character card", "broken · invalid-card", "Close menu"],
+    selections: ["Manage character resources", "Repair invalid character card", "broken · invalid-card", "Close menu"],
     editorText: createCharacterTemplate("Repaired Character"),
   });
 
@@ -179,7 +179,7 @@ test("keyboard menu can create a missing card from the unchanged repair template
   const state = new IncarnateSessionState();
   const template = createCharacterTemplate("missing-card");
   const harness = context({
-    selections: ["Repair invalid character card", "missing-card · missing-card", "Close menu"],
+    selections: ["Manage character resources", "Repair invalid character card", "missing-card · missing-card", "Close menu"],
     editorText: template,
   });
 
@@ -198,6 +198,7 @@ test("keyboard menu imports an avatar for a personal character", async (t) => {
   const state = new IncarnateSessionState();
   const harness = context({
     selections: [
+      "Manage character resources",
       "Manage character avatar",
       "Nova (nova) · personal",
       "Import avatar file",
@@ -220,6 +221,7 @@ test("avatar changes create a personal override and refresh an active built-in c
   state.activate(await loadCharacter(locations.builtInRoot, "mira"));
   const harness = context({
     selections: [
+      "Manage character resources",
       "Manage character avatar",
       "Mira (mira) · built-in",
       "Import avatar file",
@@ -253,6 +255,7 @@ test("keyboard menu creates and activates a declared missing preference form", a
   state.activate(await loadCharacter(locations.personalRoot, "nova"));
   const harness = context({
     selections: [
+      "Manage character resources",
       "Manage preference forms",
       "Nova (nova) · personal",
       "1. Notes · missing · forms/notes.md",
@@ -285,6 +288,7 @@ test("editing a built-in preference form creates a personal override", async (t)
   const state = new IncarnateSessionState();
   const harness = context({
     selections: [
+      "Manage character resources",
       "Manage preference forms",
       "Mira (mira) · built-in",
       "1. Notes · available · forms/notes.md",
