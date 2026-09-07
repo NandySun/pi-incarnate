@@ -5,6 +5,7 @@ import {
   prepareAvatarImport,
   removePersonalAvatars,
   resolveAvatarSourcePath,
+  resolveUserPath,
 } from "./avatar-manager.ts";
 
 import {
@@ -13,6 +14,12 @@ import {
   type CharacterCatalogEntry,
   type CharacterLocations,
 } from "./character-catalog.ts";
+import {
+  CHARACTER_BUNDLE_SUFFIX,
+  installCharacterBundle,
+  prepareCharacterBundleImport,
+  writeCharacterBundle,
+} from "./character-bundle.ts";
 import {
   archivePersonalCharacter,
   discoverArchivedCharacters,
@@ -40,8 +47,9 @@ export interface IncarnateMenuDependencies {
 }
 
 type MainAction = "character" | "mood" | "avatar" | "manage" | "status" | "off" | "close";
-type ManageAction = "create" | "edit" | "repair" | "avatar-file" | "forms" | "lifecycle" | "back";
+type ManageAction = "create" | "edit" | "repair" | "avatar-file" | "forms" | "lifecycle" | "bundle" | "back";
 type LifecycleAction = "rename" | "archive" | "restore" | "back";
+type BundleAction = "export" | "import" | "back";
 
 const SOURCE_LABELS = { personal: "personal", "built-in": "built-in" } as const;
 
@@ -503,6 +511,83 @@ async function manageCharacterLifecycle(
   if (action === "restore") await restoreCharacter(ctx, dependencies);
 }
 
+async function exportCharacterBundle(
+  ctx: ExtensionCommandContext,
+  dependencies: IncarnateMenuDependencies,
+): Promise<void> {
+  const selected = await chooseCharacter(ctx, dependencies.locations, "Export character package");
+  if (!selected) return;
+  const filename = `${selected.character.id}${CHARACTER_BUNDLE_SUFFIX}`;
+  const input = await ctx.ui.input(`Export file · default: ${filename}`, "leave empty to use the current directory");
+  if (input === undefined) return;
+  const availableForms = selected.character.forms.filter((form) => form.status === "available").length;
+  try {
+    const targetPath = resolveUserPath(input.trim() || filename, ctx.cwd);
+    const confirmed = await ctx.ui.confirm(
+      "Export character package?",
+      `Includes the character card, preferred avatar, and ${availableForms} available declared form(s). Preference forms may contain private information.`,
+    );
+    if (!confirmed) return;
+    const summary = await writeCharacterBundle(selected.character, targetPath);
+    ctx.ui.notify(
+      `Character package exported: ${summary.name}\nAvatar: ${summary.avatarIncluded ? "included" : "none"} · Forms: ${summary.formsIncluded}/${summary.formsDeclared}\n${targetPath}`,
+      "info",
+    );
+  } catch (error) {
+    ctx.ui.notify(errorMessage(error, "Failed to export character package"), "error");
+  }
+}
+
+async function importCharacterBundle(
+  ctx: ExtensionCommandContext,
+  dependencies: IncarnateMenuDependencies,
+): Promise<void> {
+  const personalRoot = dependencies.locations.personalRoot;
+  if (!personalRoot) {
+    ctx.ui.notify("Personal character storage is not configured", "error");
+    return;
+  }
+  const input = await ctx.ui.input("Character package", `path to a *${CHARACTER_BUNDLE_SUFFIX} file`);
+  if (!input?.trim()) return;
+  try {
+    const sourcePath = resolveUserPath(input, ctx.cwd);
+    const bundle = await prepareCharacterBundleImport(sourcePath);
+    const confirmed = await ctx.ui.confirm(
+      "Import character package?",
+      `${bundle.name} (${bundle.id}) · Avatar: ${bundle.avatar ? "included" : "none"} · Forms: ${bundle.forms.length}. Existing personal characters are never overwritten.`,
+    );
+    if (!confirmed) return;
+    const character = await installCharacterBundle(personalRoot, bundle);
+    ctx.ui.notify(`Character package imported: ${character.name} (${character.id})\n${character.directory}`, "info");
+    if (dependencies.state.activeCharacter?.id === character.id) {
+      dependencies.state.activate(character);
+      await dependencies.onStateChange?.(ctx);
+    } else if (await ctx.ui.confirm("Enable character?", `Use ${character.name} in this session now?`)) {
+      dependencies.state.activate(character);
+      await dependencies.onStateChange?.(ctx);
+    }
+  } catch (error) {
+    ctx.ui.notify(errorMessage(error, "Failed to import character package"), "error");
+  }
+}
+
+async function manageCharacterBundles(
+  ctx: ExtensionCommandContext,
+  dependencies: IncarnateMenuDependencies,
+): Promise<void> {
+  const options: Array<{ action: BundleAction; label: string }> = [
+    { action: "export", label: "Export character package" },
+    { action: "import", label: "Import character package" },
+    { action: "back", label: "← Back" },
+  ];
+  const selected = await ctx.ui.select("Portable character packages", options.map((option) => option.label));
+  if (!selected) return;
+  const action = options.find((option) => option.label === selected)?.action;
+  if (!action || action === "back") return;
+  if (action === "export") await exportCharacterBundle(ctx, dependencies);
+  if (action === "import") await importCharacterBundle(ctx, dependencies);
+}
+
 async function manageCharacterResources(
   ctx: ExtensionCommandContext,
   dependencies: IncarnateMenuDependencies,
@@ -514,6 +599,7 @@ async function manageCharacterResources(
     { action: "avatar-file", label: "Manage character avatar" },
     { action: "forms", label: "Manage preference forms" },
     { action: "lifecycle", label: "Rename, archive, or restore" },
+    { action: "bundle", label: "Export or import character package" },
     { action: "back", label: "← Main menu" },
   ];
   const selected = await ctx.ui.select("Character resources", options.map((option) => option.label));
@@ -526,6 +612,7 @@ async function manageCharacterResources(
   if (action === "avatar-file") await manageAvatarFile(ctx, dependencies);
   if (action === "forms") await manageForms(ctx, dependencies);
   if (action === "lifecycle") await manageCharacterLifecycle(ctx, dependencies);
+  if (action === "bundle") await manageCharacterBundles(ctx, dependencies);
 }
 
 function mainActions(state: IncarnateSessionState): Array<{ action: MainAction; label: string }> {

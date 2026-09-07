@@ -28,12 +28,33 @@ function stripWrappingQuotes(value: string): string {
   return (first === "'" || first === '"') && value.at(-1) === first ? value.slice(1, -1) : value;
 }
 
-export function resolveAvatarSourcePath(input: string, cwd: string, userHome = homedir()): string {
+export function resolveUserPath(input: string, cwd: string, userHome = homedir()): string {
   let value = stripWrappingQuotes(input.trim()).replace(/\\([\\ ])/g, "$1");
   if (value.startsWith("file://")) return fileURLToPath(value);
   if (value === "~") value = userHome;
   else if (value.startsWith("~/")) value = join(userHome, value.slice(2));
   return resolve(cwd, value);
+}
+
+export function resolveAvatarSourcePath(input: string, cwd: string, userHome = homedir()): string {
+  return resolveUserPath(input, cwd, userHome);
+}
+
+export function prepareAvatarContent(filename: AvatarFileName, raw: string): PreparedAvatarImport {
+  if (Buffer.byteLength(raw, "utf8") > AVATAR_MAX_BYTES) {
+    throw new CharacterEditError(`Avatar exceeds the ${AVATAR_MAX_BYTES}-byte limit`);
+  }
+  const avatar = filename === "avatar.ansi" ? sanitizeAnsiAvatar(raw) : sanitizeAvatar(raw);
+  if (avatar.lines.length === 0) throw new CharacterEditError("Avatar contains no visible content");
+  if (avatar.truncated) {
+    throw new CharacterEditError(`Avatar must fit within ${AVATAR_MAX_COLUMNS} columns and ${AVATAR_MAX_LINES} lines`);
+  }
+  return {
+    filename,
+    content: `${avatar.lines.join("\n")}\n`,
+    width: avatar.lines.reduce((maximum, line) => Math.max(maximum, visibleWidth(line)), 0),
+    height: avatar.lines.length,
+  };
 }
 
 export async function prepareAvatarImport(sourcePath: string): Promise<PreparedAvatarImport> {
@@ -67,17 +88,7 @@ export async function prepareAvatarImport(sourcePath: string): Promise<PreparedA
   } catch {
     throw new CharacterEditError(`Avatar source is not valid UTF-8: ${sourcePath}`);
   }
-  const avatar = filename === "avatar.ansi" ? sanitizeAnsiAvatar(raw) : sanitizeAvatar(raw);
-  if (avatar.lines.length === 0) throw new CharacterEditError("Avatar contains no visible content");
-  if (avatar.truncated) {
-    throw new CharacterEditError(`Avatar must fit within ${AVATAR_MAX_COLUMNS} columns and ${AVATAR_MAX_LINES} lines`);
-  }
-  return {
-    filename,
-    content: `${avatar.lines.join("\n")}\n`,
-    width: avatar.lines.reduce((maximum, line) => Math.max(maximum, visibleWidth(line)), 0),
-    height: avatar.lines.length,
-  };
+  return prepareAvatarContent(filename, raw);
 }
 
 async function assertReplaceable(path: string): Promise<void> {

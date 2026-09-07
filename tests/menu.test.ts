@@ -385,3 +385,44 @@ test("restore menu reports an unsafe archive root without leaving the menu", asy
 
   assert.ok(harness.notifications.some((message) => /must be a real directory/.test(message)));
 });
+
+test("character package menu exports and imports a built-in character as a personal override", async (t) => {
+  const locations = await roots(t);
+  const bundlePath = join(dirname(locations.personalRoot), "mira.pi-character.json");
+  const state = new IncarnateSessionState();
+  const exportHarness = context({
+    selections: [
+      "Manage character resources",
+      "Export or import character package",
+      "Export character package",
+      "Mira (mira) · built-in",
+      "Close menu",
+    ],
+    inputs: [bundlePath],
+    confirm: true,
+  });
+  await openIncarnateMenu(exportHarness.ctx, { locations, state });
+
+  assert.match(await readFile(bundlePath, "utf8"), /"format": "pi-incarnate-character"/);
+  state.activate(await loadCharacter(locations.builtInRoot, "mira"));
+  let refreshes = 0;
+  const importHarness = context({
+    selections: [
+      "Manage character resources",
+      "Export or import character package",
+      "Import character package",
+      "Close menu",
+    ],
+    inputs: [bundlePath],
+    confirm: true,
+  });
+  await openIncarnateMenu(importHarness.ctx, {
+    locations,
+    state,
+    onStateChange: () => void (refreshes += 1),
+  });
+
+  assert.match(await readFile(join(locations.personalRoot, "mira", "CHARACTER.md"), "utf8"), /^# Mira/);
+  assert.equal(state.activeCharacter?.directory, join(locations.personalRoot, "mira"));
+  assert.equal(refreshes, 1);
+});

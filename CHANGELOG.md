@@ -19,6 +19,7 @@ All notable changes to this project are documented here.
 - Add explicit TUI creation and editing for declared Markdown preference forms, with bounded UTF-8 reads, atomic writes, path containment, and built-in character overrides.
 - Group card, repair, avatar-file, and preference-form actions under a compact character-resources submenu.
 - Add personal-character rename plus recoverable archive and restore flows, with collision checks, active-session synchronization, and no permanent-delete action.
+- Add reviewable, versioned character-package export and import for cards, preferred avatars, and available declared forms, with strict file allowlisting, size bounds, and no-overwrite installation.
 
 ## 0.1.0 - 2026-09-04
 

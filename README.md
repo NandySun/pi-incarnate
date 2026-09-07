@@ -58,6 +58,7 @@ pi remove /path/to/pi-incarnate
 - 创建新角色卡，或编辑已有角色卡。
 - 修复因格式错误或缺少 `CHARACTER.md` 而从正常列表消失的个人角色。
 - 重命名、归档或恢复个人角色；归档可恢复，不提供永久删除入口。
+- 将角色卡、头像和已声明表单导出为可移植角色包，或从角色包安全导入。
 
 主菜单只保留角色选择、mood、头像模式、状态、关闭角色和 `Manage character resources`。角色卡、头像文件与偏好表单操作收在资源子菜单中，避免功能增加后主菜单持续变长。
 
@@ -167,6 +168,20 @@ Default: warm
 
 设置了 `PI_CODING_AGENT_DIR` 时仍以该目录为基准。归档会保留角色卡、头像和表单，并在归档当前角色时关闭角色模式；恢复后可选择立即启用。为了避免覆盖数据，同一 ID 只能有一个归档副本，且目标个人角色已存在时不会恢复。内置角色是只读的，不会出现在重命名或归档列表中。本版本没有永久删除角色的菜单。
 
+## 迁移角色
+
+运行 `/incarnate` → `Export or import character package` 可以迁移角色。导出文件采用可审阅的版本化 JSON，后缀为：
+
+```text
+<character-id>.pi-character.json
+```
+
+导出只收集 `CHARACTER.md`、运行时优先使用的一个头像，以及角色卡中已经声明且当前可用的 Markdown 表单。未知文件、未声明文件、缺失或无效表单和被另一格式遮蔽的头像不会进入角色包。确认界面会显示实际包含的头像和表单数量；偏好表单可能包含私人信息，分享前应直接打开 JSON 检查。
+
+导入会先检查格式版本、安全 ID、UTF-8、文件数量与总大小、角色卡结构、头像安全边界，以及每份表单是否由卡片明确声明。路径穿越、重复路径、未知文件、符号链接来源和同时包含两个头像的包都会被拒绝。整个角色先在个人目录内的临时位置完成构建和加载，再整体移动到正式位置；不会覆盖已有个人角色。同 ID 只有内置角色时，导入结果会成为个人覆盖副本。导入成功后可选择立即启用。
+
+角色包最大 1 MiB、最多 66 个文件；其中角色卡最大 512 KiB，表单和头像继续沿用各自的 256 KiB 与 64 KiB 限制。导出目标和导入来源支持与头像导入相同的绝对路径、相对路径、`~/...`、`file://...`、引号和转义空格输入。导出不会覆盖已有文件。
+
 ## 故障排查
 
 - `No valid characters found`：确认角色位于个人目录或包内 `characters/<id>/CHARACTER.md`，目录 ID 合法。
@@ -186,6 +201,7 @@ src/character-loader.ts   角色发现、UTF-8 与章节验证
 src/character-catalog.ts  个人/内置角色合并与覆盖规则
 src/character-editor.ts   模板、校验、安全创建与原子保存
 src/character-lifecycle.ts 个人角色重命名、可恢复归档与恢复
+src/character-bundle.ts   版本化角色包导出、验证与原子导入
 src/session-state.ts      当前 session 的角色/mood/avatar 状态
 src/persona.ts            有界人格 prompt 组合
 src/commands.ts           /incarnate 命令
