@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { test, type TestContext } from "node:test";
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 
 import { createCharacterTemplate } from "../src/character-editor.ts";
+import { loadCharacter } from "../src/character-loader.ts";
 import { openIncarnateMenu } from "../src/menu.ts";
 import { IncarnateSessionState } from "../src/session-state.ts";
 
@@ -33,6 +34,7 @@ function context(options: {
   const ctx = {
     hasUI: true,
     mode: "tui",
+    cwd: process.cwd(),
     ui: {
       async select(_title: string, items: string[]) {
         const selected = selections.shift();
@@ -185,4 +187,56 @@ test("keyboard menu can create a missing card from the unchanged repair template
 
   assert.equal(await readFile(join(missingDirectory, "CHARACTER.md"), "utf8"), template);
   assert.match(harness.notifications.at(-1) ?? "", /Character card repaired: missing-card/);
+});
+
+test("keyboard menu imports an avatar for a personal character", async (t) => {
+  const locations = await roots(t);
+  await mkdir(join(locations.personalRoot, "nova"), { recursive: true });
+  await writeFile(join(locations.personalRoot, "nova", "CHARACTER.md"), createCharacterTemplate("Nova"));
+  const source = join(dirname(locations.personalRoot), "portrait file.txt");
+  await writeFile(source, "(nova)\n");
+  const state = new IncarnateSessionState();
+  const harness = context({
+    selections: [
+      "Manage character avatar",
+      "Nova (nova) · personal",
+      "Import avatar file",
+      "Close menu",
+    ],
+    inputs: [`'${source}'`],
+  });
+
+  await openIncarnateMenu(harness.ctx, { locations, state });
+
+  assert.equal(await readFile(join(locations.personalRoot, "nova", "avatar.txt"), "utf8"), "(nova)\n");
+  assert.match(harness.notifications.at(-1) ?? "", /Avatar imported: 6×1/);
+});
+
+test("avatar changes create a personal override and refresh an active built-in character", async (t) => {
+  const locations = await roots(t);
+  const source = join(dirname(locations.personalRoot), "portrait.ansi");
+  await writeFile(source, "\u001b[31mface\u001b[0m\n");
+  const state = new IncarnateSessionState();
+  state.activate(await loadCharacter(locations.builtInRoot, "mira"));
+  const harness = context({
+    selections: [
+      "Manage character avatar",
+      "Mira (mira) · built-in",
+      "Import avatar file",
+      "Close menu",
+    ],
+    inputs: [source],
+    confirm: true,
+  });
+  let refreshes = 0;
+
+  await openIncarnateMenu(harness.ctx, {
+    locations,
+    state,
+    onStateChange: () => void (refreshes += 1),
+  });
+
+  assert.equal(state.activeCharacter?.directory, join(locations.personalRoot, "mira"));
+  assert.match(await readFile(join(locations.personalRoot, "mira", "avatar.ansi"), "utf8"), /\u001b\[31mface/);
+  assert.equal(refreshes, 1);
 });

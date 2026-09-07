@@ -1,6 +1,13 @@
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 
 import {
+  installPersonalAvatar,
+  prepareAvatarImport,
+  removePersonalAvatars,
+  resolveAvatarSourcePath,
+} from "./avatar-manager.ts";
+
+import {
   characterSource,
   discoverCharacterCatalog,
   type CharacterCatalogEntry,
@@ -25,7 +32,7 @@ export interface IncarnateMenuDependencies {
   onStateChange?: (ctx: ExtensionCommandContext) => Promise<void> | void;
 }
 
-type MainAction = "character" | "mood" | "avatar" | "create" | "edit" | "repair" | "status" | "off" | "close";
+type MainAction = "character" | "mood" | "avatar" | "avatar-file" | "create" | "edit" | "repair" | "status" | "off" | "close";
 
 const SOURCE_LABELS = { personal: "personal", "built-in": "built-in" } as const;
 
@@ -251,12 +258,81 @@ async function repairCharacter(ctx: ExtensionCommandContext, dependencies: Incar
   }
 }
 
+async function personalCharacterForResources(
+  ctx: ExtensionCommandContext,
+  dependencies: IncarnateMenuDependencies,
+  selected: CharacterCatalogEntry,
+): Promise<Character | undefined> {
+  const personalRoot = dependencies.locations.personalRoot;
+  if (!personalRoot) throw new CharacterEditError("Personal character storage is not configured");
+  if (selected.source === "personal") return selected.character;
+  const confirmed = await ctx.ui.confirm(
+    "Create personal copy?",
+    `${selected.character.name} is built in. Avatar changes require a personal override that survives package updates.`,
+  );
+  if (!confirmed) return undefined;
+  const markdown = await readCharacterCard(selected.character);
+  return await createPersonalOverride(personalRoot, selected.character, markdown);
+}
+
+async function refreshEditedCharacter(
+  ctx: ExtensionCommandContext,
+  dependencies: IncarnateMenuDependencies,
+  character: Character,
+): Promise<void> {
+  if (dependencies.state.activeCharacter?.id !== character.id) return;
+  dependencies.state.activate(character);
+  await dependencies.onStateChange?.(ctx);
+}
+
+async function manageAvatarFile(ctx: ExtensionCommandContext, dependencies: IncarnateMenuDependencies): Promise<void> {
+  const personalRoot = dependencies.locations.personalRoot;
+  if (!personalRoot) {
+    ctx.ui.notify("Personal character storage is not configured", "error");
+    return;
+  }
+  const selected = await chooseCharacter(ctx, dependencies.locations, "Manage character avatar");
+  if (!selected) return;
+  const action = await ctx.ui.select(`Avatar file · ${selected.character.name}`, [
+    "Import avatar file",
+    "Remove avatar file",
+    "← Back",
+  ]);
+  if (!action || action === "← Back") return;
+
+  try {
+    if (action === "Import avatar file") {
+      const input = await ctx.ui.input("Avatar file", "path to a .ansi or .txt file; drag and drop is supported");
+      if (!input?.trim()) return;
+      const sourcePath = resolveAvatarSourcePath(input, ctx.cwd);
+      const prepared = await prepareAvatarImport(sourcePath);
+      const character = await personalCharacterForResources(ctx, dependencies, selected);
+      if (!character) return;
+      const targetPath = await installPersonalAvatar(personalRoot, character.id, prepared);
+      await refreshEditedCharacter(ctx, dependencies, character);
+      ctx.ui.notify(`Avatar imported: ${prepared.width}×${prepared.height}\n${targetPath}`, "info");
+      return;
+    }
+
+    const confirmed = await ctx.ui.confirm("Remove avatar?", `Remove the personal avatar for ${selected.character.name}?`);
+    if (!confirmed) return;
+    const character = await personalCharacterForResources(ctx, dependencies, selected);
+    if (!character) return;
+    const removed = await removePersonalAvatars(personalRoot, character.id);
+    await refreshEditedCharacter(ctx, dependencies, character);
+    ctx.ui.notify(removed > 0 ? `Avatar removed: ${character.name}` : `${character.name} has no personal avatar`, "info");
+  } catch (error) {
+    ctx.ui.notify(errorMessage(error, "Failed to manage avatar"), "error");
+  }
+}
+
 function mainActions(state: IncarnateSessionState): Array<{ action: MainAction; label: string }> {
   const active = state.activeCharacter;
   return [
     { action: "character", label: `Choose character${active ? ` · ${active.name}` : ""}` },
     { action: "mood", label: `Choose mood${state.currentMood ? ` · ${state.currentMood}` : ""}` },
     { action: "avatar", label: `Avatar mode · ${state.avatarMode}` },
+    { action: "avatar-file", label: "Manage character avatar" },
     { action: "create", label: "Create character card" },
     { action: "edit", label: "Edit character card" },
     { action: "repair", label: "Repair invalid character card" },
@@ -279,6 +355,7 @@ export async function openIncarnateMenu(
     if (action === "character") await switchCharacter(ctx, dependencies);
     if (action === "mood") await chooseMood(ctx, dependencies);
     if (action === "avatar") await chooseAvatarMode(ctx, dependencies);
+    if (action === "avatar-file") await manageAvatarFile(ctx, dependencies);
     if (action === "create") await createCharacter(ctx, dependencies);
     if (action === "edit") await editCharacter(ctx, dependencies);
     if (action === "repair") await repairCharacter(ctx, dependencies);

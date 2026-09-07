@@ -52,6 +52,7 @@ pi remove /path/to/pi-incarnate
 - 选择或关闭角色。
 - 切换当前角色的 mood。
 - 切换头像的 `auto`、`full`、`compact`、`off` 模式。
+- 为角色导入或移除 `.ansi` / `.txt` 头像文件。
 - 查看当前状态。
 - 创建新角色卡，或编辑已有角色卡。
 - 修复因格式错误或缺少 `CHARACTER.md` 而从正常列表消失的个人角色。
@@ -146,7 +147,11 @@ Default: warm
 
 如果个人角色卡已经损坏，运行 `/incarnate` 并选择 `Repair invalid character card`。菜单只列出目录 ID 安全、位于个人角色根目录内，且属于“卡片格式错误”或“缺少卡片”的项目。格式错误的 UTF-8 卡片会在原内容上编辑；缺少卡片时会提供完整模板。无效编码、符号链接和越界目录不会在 TUI 中打开。
 
+头像可以通过 `/incarnate` → `Manage character avatar` 导入或移除。选择角色后输入 `.ansi` 或 `.txt` 文件路径；支持绝对路径、相对当前工作目录的路径、`~/...`、`file://...`、成对引号和终端拖放常见的转义空格。导入内置角色时会先请求创建个人覆盖副本，包内资源不会被修改。
+
 `avatar.txt` 是纯文本格式，会去除 ANSI 和终端控制序列。`avatar.ansi` 用于彩色头像，存在时优先于 `avatar.txt`；它只保留标准色、256 色、24-bit 前景/背景色及 reset，光标移动、清屏、OSC、超链接和其他控制序列一律删除。两种格式都要求 UTF-8，最大 64 KiB、16 行、每行 48 个终端列。ANSI 每行会强制 reset，防止颜色泄漏到 Pi 界面。头像损坏或不可读时只降级为角色状态行，不会关闭已经启用的人格。
+
+菜单导入会把清理后的安全版本写入个人角色目录，并拒绝需要裁剪的资源，避免静默损失图像。导入一种格式会移除另一种格式，确保新头像立即生效；写入使用同目录临时文件替换。移除操作需要确认，只删除个人副本中的 `avatar.ansi` 和 `avatar.txt`。
 
 ## 故障排查
 
@@ -171,6 +176,7 @@ src/persona.ts            有界人格 prompt 组合
 src/commands.ts           /incarnate 命令
 src/menu.ts               键盘导航菜单与角色卡编辑流程
 src/avatar.ts             ASCII/ANSI 头像读取与安全清理
+src/avatar-manager.ts     头像路径解析、安全导入与移除
 src/mood.ts               mood 预设解析和 prompt 片段
 src/forms.ts              表单声明解析与路径边界校验
 characters/mira/          原创示例角色与三份空白表单

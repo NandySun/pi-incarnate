@@ -116,7 +116,7 @@ export async function createPersonalCharacter(
   return await loadCharacter(personalRoot, id);
 }
 
-async function resolvePersonalDirectory(personalRoot: string, id: string): Promise<string> {
+export async function resolvePersonalDirectory(personalRoot: string, id: string): Promise<string> {
   if (!isCharacterId(id)) throw new CharacterEditError(`Invalid character id: ${id}`);
   const canonicalRoot = await realpath(personalRoot);
   const candidate = join(canonicalRoot, id);
