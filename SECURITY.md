@@ -8,6 +8,7 @@ Pi extensions execute with the same system permissions as Pi. Review this packag
 - Character directories and `CHARACTER.md` files cannot be symbolic links.
 - Built-in package characters are never edited in place; menu edits create a personal override under the Pi configuration directory.
 - Character-card writes are validated before an atomic replacement, and copied character resources reject symbolic links and non-regular files.
+- Guided card edits replace only the selected top-level name or level-two section, reject ambiguous duplicates and structural heading injection, and pass through the same complete-card validation and atomic replacement as full edits.
 - Character lifecycle actions operate only on direct personal-character directories. Archive storage must be a real directory, moves refuse existing targets, and the menu exposes recovery instead of permanent deletion.
 - Portable character packages include only the card, one validated avatar, and available forms explicitly declared by that card. Imports reject unknown, duplicate, escaping, oversized, non-UTF-8, and symbolic-link inputs, build in a temporary personal directory, and never overwrite an existing personal character.
 - Declared form paths must resolve to readable files inside their character directory.

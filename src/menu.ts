@@ -36,6 +36,14 @@ import {
   readPersonalCharacterDraft,
   updatePersonalCharacter,
 } from "./character-editor.ts";
+import {
+  GUIDED_CHARACTER_SECTIONS,
+  readCharacterSection,
+  sectionStarter,
+  updateCharacterName,
+  updateCharacterSection,
+  type GuidedCharacterSection,
+} from "./character-section-editor.ts";
 import { readFormDraft, savePersonalForm } from "./form-editor.ts";
 import { discoverCharacters, isCharacterId, loadCharacter, type Character, type CharacterIssue } from "./character-loader.ts";
 import type { AvatarMode, IncarnateSessionState } from "./session-state.ts";
@@ -47,7 +55,7 @@ export interface IncarnateMenuDependencies {
 }
 
 type MainAction = "character" | "mood" | "avatar" | "manage" | "status" | "off" | "close";
-type ManageAction = "create" | "edit" | "repair" | "avatar-file" | "forms" | "lifecycle" | "bundle" | "back";
+type ManageAction = "create" | "edit-sections" | "edit" | "repair" | "avatar-file" | "forms" | "lifecycle" | "bundle" | "back";
 type LifecycleAction = "rename" | "archive" | "restore" | "back";
 type BundleAction = "export" | "import" | "back";
 
@@ -156,7 +164,7 @@ async function promptForCharacterId(
       continue;
     }
     if (existingIds.has(id)) {
-      ctx.ui.notify(`Character already exists: ${id}. Choose Edit character card instead.`, "error");
+      ctx.ui.notify(`Character already exists: ${id}. Choose a character editing action instead.`, "error");
       continue;
     }
     if (raw && raw !== id) ctx.ui.notify(`Character id normalized to: ${id}`, "info");
@@ -233,6 +241,65 @@ async function editCharacter(ctx: ExtensionCommandContext, dependencies: Incarna
     ctx.ui.notify(`Character card saved: ${character.name}\n${character.cardPath}`, "info");
   } catch (error) {
     ctx.ui.notify(errorMessage(error, "Failed to edit character"), "error");
+  }
+}
+
+async function editCharacterSections(
+  ctx: ExtensionCommandContext,
+  dependencies: IncarnateMenuDependencies,
+): Promise<void> {
+  const selected = await chooseCharacter(ctx, dependencies.locations, "Edit character sections");
+  if (!selected) return;
+  if (selected.source === "built-in") {
+    const confirmed = await ctx.ui.confirm(
+      "Create personal copy?",
+      `${selected.character.name} is built in. Editing creates a personal override that survives package updates.`,
+    );
+    if (!confirmed) return;
+  }
+
+  try {
+    const current = await readCharacterCard(selected.character);
+    const options: Array<{ action: "name" | GuidedCharacterSection | "back"; label: string }> = [
+      { action: "name", label: `Display name · ${selected.character.name}` },
+      ...GUIDED_CHARACTER_SECTIONS.map((name) => {
+        const draft = readCharacterSection(current, name);
+        const optionalStatus = name === "Current Mood" || name === "Tools and Forms"
+          ? ` · ${draft.exists ? "configured" : "not configured"}`
+          : "";
+        return { action: name, label: `${name}${optionalStatus}` };
+      }),
+      { action: "back", label: "← Back" },
+    ];
+    const choice = await ctx.ui.select(`Character sections · ${selected.character.name}`, options.map((option) => option.label));
+    if (!choice) return;
+    const action = options.find((option) => option.label === choice)?.action;
+    if (!action || action === "back") return;
+
+    let markdown: string;
+    let changedLabel: string;
+    if (action === "name") {
+      const name = await ctx.ui.input(`Display name · current: ${selected.character.name}`, "enter a new display name");
+      if (name === undefined) return;
+      markdown = updateCharacterName(current, name);
+      if (markdown === current.replace(/\r\n?/g, "\n")) return;
+      changedLabel = "Display name";
+    } else {
+      const draft = readCharacterSection(current, action);
+      const content = await ctx.ui.editor(
+        `Edit section · ${action}`,
+        draft.exists ? draft.content : sectionStarter(action),
+      );
+      if (content === undefined || (draft.exists && content === draft.content)) return;
+      markdown = updateCharacterSection(current, action, content);
+      changedLabel = action;
+    }
+
+    const character = await saveEditedCharacter(dependencies, selected, markdown);
+    await refreshEditedCharacter(ctx, dependencies, character);
+    ctx.ui.notify(`Character section saved: ${changedLabel}\n${character.cardPath}`, "info");
+  } catch (error) {
+    ctx.ui.notify(errorMessage(error, "Failed to edit character section"), "error");
   }
 }
 
@@ -594,7 +661,8 @@ async function manageCharacterResources(
 ): Promise<void> {
   const options: Array<{ action: ManageAction; label: string }> = [
     { action: "create", label: "Create character card" },
-    { action: "edit", label: "Edit character card" },
+    { action: "edit-sections", label: "Edit character sections" },
+    { action: "edit", label: "Edit complete character card" },
     { action: "repair", label: "Repair invalid character card" },
     { action: "avatar-file", label: "Manage character avatar" },
     { action: "forms", label: "Manage preference forms" },
@@ -607,6 +675,7 @@ async function manageCharacterResources(
   const action = options.find((option) => option.label === selected)?.action;
   if (!action || action === "back") return;
   if (action === "create") await createCharacter(ctx, dependencies);
+  if (action === "edit-sections") await editCharacterSections(ctx, dependencies);
   if (action === "edit") await editCharacter(ctx, dependencies);
   if (action === "repair") await repairCharacter(ctx, dependencies);
   if (action === "avatar-file") await manageAvatarFile(ctx, dependencies);

@@ -55,7 +55,7 @@ pi remove /path/to/pi-incarnate
 - 为角色导入或移除 `.ansi` / `.txt` 头像文件。
 - 查看、创建或编辑角色卡已经声明的 Markdown 偏好表单。
 - 查看当前状态。
-- 创建新角色卡，或编辑已有角色卡。
+- 创建新角色卡，按章节引导编辑，或直接编辑完整 Markdown。
 - 修复因格式错误或缺少 `CHARACTER.md` 而从正常列表消失的个人角色。
 - 重命名、归档或恢复个人角色；归档可恢复，不提供永久删除入口。
 - 将角色卡、头像和已声明表单导出为可移植角色包，或从角色包安全导入。
@@ -87,6 +87,8 @@ pi remove /path/to/pi-incarnate
 ## 编写角色卡
 
 推荐直接运行 `/incarnate`，选择 `Create character card`。先输入支持中文的角色显示名，再确认仅用于目录和命令的安全 ID；ID 留空会采用自动建议值，大写字母、空格和下划线会规范化。随后 Pi 会打开带完整结构的多行模板：`Enter` 保存，`Shift+Enter` 或 `Ctrl+J` 插入换行，`Ctrl+G` 可调用外部编辑器，`Esc` 取消且不写入文件。
+
+日常调整推荐选择 `Edit character sections`。导航菜单可以只打开显示名、`Identity`、`Personality`、`Speech Style`、`Behavior`、`Current Mood` 或 `Tools and Forms`；不需要在整篇 Markdown 中寻找位置。每次只替换选中的标题或章节正文，代码围栏中的伪标题、其他自定义章节和未选择内容保持不变。缺少可选的 mood 或表单章节时会提供起始模板。章节正文不能新增一级或二级结构标题，三级 mood 标题仍可使用；需要调整标题顺序、增加自定义章节或进行大范围重构时，选择 `Edit complete character card`。保存前仍执行整张角色卡校验，失败时原文件不变。
 
 个人角色保存在：
 
@@ -148,7 +150,7 @@ Default: warm
 
 扩展在正常角色加载和人格注入时只解析这些显式列表项并检查路径，不读取或缓存表单正文。绝对路径、`..` 穿越、目录以及解析到角色目录外的符号链接都会被标为无效。
 
-运行 `/incarnate` 并选择 `Manage preference forms`，可以打开已经声明且可用的 `.md` 表单，或从模板创建尚不存在的表单。只有用户明确选择编辑时才读取正文；编辑器限制为 256 KiB、有效 UTF-8、普通文件和角色目录内路径。编辑内置角色表单时会先创建个人覆盖副本，原包文件保持不变。新增表单声明仍通过 `Edit character card` 修改 `Tools and Forms` 章节。
+运行 `/incarnate` 并选择 `Manage preference forms`，可以打开已经声明且可用的 `.md` 表单，或从模板创建尚不存在的表单。只有用户明确选择编辑时才读取正文；编辑器限制为 256 KiB、有效 UTF-8、普通文件和角色目录内路径。编辑内置角色表单时会先创建个人覆盖副本，原包文件保持不变。新增表单声明可通过 `Edit character sections` 单独修改 `Tools and Forms` 章节。
 
 菜单保存角色卡前会执行与运行时相同的必需章节和 mood 校验。格式错误时保留原文件并显示原因；创建过程使用暂存目录，编辑过程使用同目录临时文件原子替换。
 
@@ -200,6 +202,7 @@ extensions/index.ts       Pi 扩展入口和生命周期
 src/character-loader.ts   角色发现、UTF-8 与章节验证
 src/character-catalog.ts  个人/内置角色合并与覆盖规则
 src/character-editor.ts   模板、校验、安全创建与原子保存
+src/character-section-editor.ts 单章节定位与保留式更新
 src/character-lifecycle.ts 个人角色重命名、可恢复归档与恢复
 src/character-bundle.ts   版本化角色包导出、验证与原子导入
 src/session-state.ts      当前 session 的角色/mood/avatar 状态

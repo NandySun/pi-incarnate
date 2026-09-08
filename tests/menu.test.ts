@@ -144,7 +144,7 @@ test("editing a built-in card through the menu creates a personal override", asy
   const locations = await roots(t);
   const state = new IncarnateSessionState();
   const harness = context({
-    selections: ["Manage character resources", "Edit character card", "Mira (mira) · built-in", "Close menu"],
+    selections: ["Manage character resources", "Edit complete character card", "Mira (mira) · built-in", "Close menu"],
     editorText: MIRA_CARD.replace("# Mira", "# Personal Mira"),
     confirm: true,
   });
@@ -153,6 +153,93 @@ test("editing a built-in card through the menu creates a personal override", asy
 
   assert.match(await readFile(join(locations.personalRoot, "mira", "CHARACTER.md"), "utf8"), /^# Personal Mira/);
   assert.match(harness.notifications.at(-1) ?? "", /Character card saved: Personal Mira/);
+});
+
+test("guided editor changes one section and preserves custom content", async (t) => {
+  const locations = await roots(t);
+  const original = createCharacterTemplate("Nova").replace(
+    "## Personality",
+    "## Custom Notes\n\nKeep this exactly.\n\n## Personality",
+  );
+  await mkdir(join(locations.personalRoot, "nova"), { recursive: true });
+  await writeFile(join(locations.personalRoot, "nova", "CHARACTER.md"), original);
+  const state = new IncarnateSessionState();
+  state.activate(await loadCharacter(locations.personalRoot, "nova"));
+  const harness = context({
+    selections: [
+      "Manage character resources",
+      "Edit character sections",
+      "Nova (nova) · personal",
+      "Identity",
+      "Close menu",
+    ],
+    editorText: "A guided identity.",
+  });
+  let refreshes = 0;
+
+  await openIncarnateMenu(harness.ctx, {
+    locations,
+    state,
+    onStateChange: () => void (refreshes += 1),
+  });
+
+  const saved = await readFile(join(locations.personalRoot, "nova", "CHARACTER.md"), "utf8");
+  assert.match(saved, /## Identity\n\nA guided identity\./);
+  assert.match(saved, /## Custom Notes\n\nKeep this exactly\./);
+  assert.equal(state.activeCharacter?.sections.Identity, "A guided identity.");
+  assert.equal(refreshes, 1);
+});
+
+test("guided name editing creates a personal override for a built-in character", async (t) => {
+  const locations = await roots(t);
+  const state = new IncarnateSessionState();
+  state.activate(await loadCharacter(locations.builtInRoot, "mira"));
+  const harness = context({
+    selections: [
+      "Manage character resources",
+      "Edit character sections",
+      "Mira (mira) · built-in",
+      "Display name · Mira",
+      "Close menu",
+    ],
+    inputs: ["Personal Mira"],
+    confirm: true,
+  });
+  let refreshes = 0;
+
+  await openIncarnateMenu(harness.ctx, {
+    locations,
+    state,
+    onStateChange: () => void (refreshes += 1),
+  });
+
+  assert.equal((await loadCharacter(locations.personalRoot, "mira")).name, "Personal Mira");
+  assert.equal((await loadCharacter(locations.builtInRoot, "mira")).name, "Mira");
+  assert.equal(state.activeCharacter?.name, "Personal Mira");
+  assert.equal(refreshes, 1);
+});
+
+test("guided editor leaves the card unchanged when a section fails validation", async (t) => {
+  const locations = await roots(t);
+  const original = createCharacterTemplate("Nova");
+  await mkdir(join(locations.personalRoot, "nova"), { recursive: true });
+  await writeFile(join(locations.personalRoot, "nova", "CHARACTER.md"), original);
+  const state = new IncarnateSessionState();
+  const harness = context({
+    selections: [
+      "Manage character resources",
+      "Edit character sections",
+      "Nova (nova) · personal",
+      "Identity",
+      "Close menu",
+    ],
+    editorText: "",
+  });
+
+  await openIncarnateMenu(harness.ctx, { locations, state });
+
+  assert.equal(await readFile(join(locations.personalRoot, "nova", "CHARACTER.md"), "utf8"), original);
+  assert.ok(harness.notifications.some((message) => /missing required non-empty sections: Identity/.test(message)));
 });
 
 test("keyboard menu repairs a personal card that disappeared from the valid catalog", async (t) => {
