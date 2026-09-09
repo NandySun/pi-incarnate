@@ -1,5 +1,6 @@
 import type { Character } from "./character-loader.ts";
 import { composeFormsPrompt } from "./forms.ts";
+import { removeLevelTwoSection } from "./markdown.ts";
 import { composeMoodPrompt } from "./mood.ts";
 
 const RUNTIME_RULES = `You are operating with a pi-incarnate character persona.
@@ -13,12 +14,13 @@ const RUNTIME_RULES = `You are operating with a pi-incarnate character persona.
 export function composePersonaPrompt(character: Character, currentMood?: string): string {
   const formsPrompt = composeFormsPrompt(character.forms);
   const moodPrompt = composeMoodPrompt(character.mood, currentMood);
+  const runtimeCard = removeLevelTwoSection(character.markdown, "Current Mood");
   return `${RUNTIME_RULES}
 
 Active character: ${character.name} (${character.id})
 
 <character-card>
-${character.markdown}
+${runtimeCard}
 </character-card>${formsPrompt ? `\n\n${formsPrompt}` : ""}${moodPrompt ? `\n\n${moodPrompt}` : ""}`;
 }
 

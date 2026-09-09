@@ -1,6 +1,6 @@
 {
   "name": "pi-incarnate",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A character persona layer for Pi Agent",
   "author": "NandySun",
   "type": "module",
@@ -25,14 +25,18 @@
     "CHANGELOG.md",
     "SECURITY.md",
     "characters",
+    "evals",
     "extensions",
+    "scripts/persona-eval.mjs",
     "src",
     "README.md"
   ],
   "scripts": {
     "check": "tsc --noEmit",
     "test": "node --test tests/*.test.ts",
+    "test:companion": "node --test tests/companion-ui.integration.mjs",
     "test:package": "node scripts/package-smoke.mjs",
+    "eval:persona": "node scripts/persona-eval.mjs",
     "verify": "npm run check && npm test",
     "release:check": "npm run verify && npm run test:package && npm pack --dry-run --ignore-scripts",
     "prepublishOnly": "npm run verify"

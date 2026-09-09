@@ -15,10 +15,31 @@ jobs:
       matrix:
         node-version: [22.19.0, 24.x]
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out core
+        uses: actions/checkout@v4
+        with:
+          path: pi-incarnate
+      - name: Check out companion UI
+        uses: actions/checkout@v4
+        with:
+          repository: NandySun/pi-incarnate-ui
+          path: pi-incarnate-ui
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
-      - run: npm ci
-      - run: npm run release:check
+          cache-dependency-path: |
+            pi-incarnate/package-lock.json
+            pi-incarnate-ui/package-lock.json
+      - name: Install core dependencies
+        run: npm ci
+        working-directory: pi-incarnate
+      - name: Install companion dependencies
+        run: npm ci
+        working-directory: pi-incarnate-ui
+      - name: Verify core package
+        run: npm run release:check
+        working-directory: pi-incarnate
+      - name: Verify real core and companion integration
+        run: npm run test:companion
+        working-directory: pi-incarnate

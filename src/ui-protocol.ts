@@ -4,7 +4,6 @@ import type { Avatar } from "./avatar.ts";
 import { characterSource, type CharacterLocations, type CharacterSource } from "./character-catalog.ts";
 import type { AvatarMode, IncarnateSessionState } from "./session-state.ts";
 
-export const UI_CLAIM_EVENT = "pi-incarnate:ui:claim-v1";
 export const UI_REQUEST_STATE_EVENT = "pi-incarnate:ui:request-state-v1";
 export const UI_STATE_EVENT = "pi-incarnate:ui:state-v1";
 

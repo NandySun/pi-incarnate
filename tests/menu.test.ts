@@ -27,8 +27,9 @@ function context(options: {
   inputs?: string[];
   editorText?: string;
   confirm?: boolean;
-}): { ctx: ExtensionCommandContext; notifications: string[] } {
+}): { ctx: ExtensionCommandContext; notifications: string[]; menus: Array<{ title: string; items: string[] }> } {
   const notifications: string[] = [];
+  const menus: Array<{ title: string; items: string[] }> = [];
   const selections = [...options.selections];
   const inputs = [...(options.inputs ?? [])];
   const ctx = {
@@ -36,7 +37,8 @@ function context(options: {
     mode: "tui",
     cwd: process.cwd(),
     ui: {
-      async select(_title: string, items: string[]) {
+      async select(title: string, items: string[]) {
+        menus.push({ title, items: [...items] });
         const selected = selections.shift();
         assert.ok(selected === undefined || items.includes(selected), `Unexpected menu choice: ${selected}`);
         return selected;
@@ -55,8 +57,43 @@ function context(options: {
       },
     },
   } as unknown as ExtensionCommandContext;
-  return { ctx, notifications };
+  return { ctx, notifications, menus };
 }
+
+test("main menu shows only actions relevant to an inactive session", async (t) => {
+  const locations = await roots(t);
+  const state = new IncarnateSessionState();
+  const harness = context({ selections: ["Close menu"] });
+
+  await openIncarnateMenu(harness.ctx, { locations, state });
+
+  assert.deepEqual(harness.menus[0], {
+    title: "pi-incarnate",
+    items: ["Choose character", "Character library", "Show status", "Close menu"],
+  });
+});
+
+test("main menu reveals mood, appearance, and disable actions for an active character", async (t) => {
+  const locations = await roots(t);
+  const state = new IncarnateSessionState();
+  state.activate(await loadCharacter(locations.builtInRoot, "mira"));
+  const harness = context({ selections: ["Close menu"] });
+
+  await openIncarnateMenu(harness.ctx, { locations, state });
+
+  assert.deepEqual(harness.menus[0], {
+    title: "pi-incarnate",
+    items: [
+      "Change character · Mira",
+      "Choose mood · normal",
+      "Avatar mode · auto",
+      "Character library",
+      "Show status",
+      "Disable active character",
+      "Close menu",
+    ],
+  });
+});
 
 test("keyboard menu selects and activates a character", async (t) => {
   const locations = await roots(t);
@@ -77,7 +114,7 @@ test("keyboard menu creates, validates, stores, and activates a character", asyn
   const locations = await roots(t);
   const state = new IncarnateSessionState();
   const harness = context({
-    selections: ["Manage character resources", "Create character card", "Close menu"],
+    selections: ["Character library", "Add or restore character", "Create character card", "Close menu"],
     inputs: ["Nova", "nova"],
     editorText: createCharacterTemplate("Nova"),
     confirm: true,
@@ -93,7 +130,7 @@ test("character creation accepts a Chinese name and an automatically suggested s
   const locations = await roots(t);
   const state = new IncarnateSessionState();
   const harness = context({
-    selections: ["Manage character resources", "Create character card", "Close menu"],
+    selections: ["Character library", "Add or restore character", "Create character card", "Close menu"],
     inputs: ["星澜", ""],
     editorText: createCharacterTemplate("星澜"),
   });
@@ -107,7 +144,7 @@ test("invalid character ids stay in the prompt and common formatting is normaliz
   const locations = await roots(t);
   const state = new IncarnateSessionState();
   const harness = context({
-    selections: ["Manage character resources", "Create character card", "Close menu"],
+    selections: ["Character library", "Add or restore character", "Create character card", "Close menu"],
     inputs: ["Nova Prime", "角色", "Nova_Prime"],
     editorText: createCharacterTemplate("Nova Prime"),
   });
@@ -144,7 +181,7 @@ test("editing a built-in card through the menu creates a personal override", asy
   const locations = await roots(t);
   const state = new IncarnateSessionState();
   const harness = context({
-    selections: ["Manage character resources", "Edit complete character card", "Mira (mira) · built-in", "Close menu"],
+    selections: ["Character library", "Edit character", "Edit complete character card", "Mira (mira) · built-in", "Close menu"],
     editorText: MIRA_CARD.replace("# Mira", "# Personal Mira"),
     confirm: true,
   });
@@ -167,7 +204,8 @@ test("guided editor changes one section and preserves custom content", async (t)
   state.activate(await loadCharacter(locations.personalRoot, "nova"));
   const harness = context({
     selections: [
-      "Manage character resources",
+      "Character library",
+      "Edit character",
       "Edit character sections",
       "Nova (nova) · personal",
       "Identity",
@@ -196,7 +234,8 @@ test("guided name editing creates a personal override for a built-in character",
   state.activate(await loadCharacter(locations.builtInRoot, "mira"));
   const harness = context({
     selections: [
-      "Manage character resources",
+      "Character library",
+      "Edit character",
       "Edit character sections",
       "Mira (mira) · built-in",
       "Display name · Mira",
@@ -227,7 +266,8 @@ test("guided editor leaves the card unchanged when a section fails validation", 
   const state = new IncarnateSessionState();
   const harness = context({
     selections: [
-      "Manage character resources",
+      "Character library",
+      "Edit character",
       "Edit character sections",
       "Nova (nova) · personal",
       "Identity",
@@ -249,7 +289,7 @@ test("keyboard menu repairs a personal card that disappeared from the valid cata
   await writeFile(join(brokenDirectory, "CHARACTER.md"), "# Broken\n\n## Identity\nOnly one section.\n");
   const state = new IncarnateSessionState();
   const harness = context({
-    selections: ["Manage character resources", "Repair invalid character card", "broken · invalid-card", "Close menu"],
+    selections: ["Character library", "Add or restore character", "Repair invalid character card", "broken · invalid-card", "Close menu"],
     editorText: createCharacterTemplate("Repaired Character"),
   });
 
@@ -266,7 +306,7 @@ test("keyboard menu can create a missing card from the unchanged repair template
   const state = new IncarnateSessionState();
   const template = createCharacterTemplate("missing-card");
   const harness = context({
-    selections: ["Manage character resources", "Repair invalid character card", "missing-card · missing-card", "Close menu"],
+    selections: ["Character library", "Add or restore character", "Repair invalid character card", "missing-card · missing-card", "Close menu"],
     editorText: template,
   });
 
@@ -285,7 +325,8 @@ test("keyboard menu imports an avatar for a personal character", async (t) => {
   const state = new IncarnateSessionState();
   const harness = context({
     selections: [
-      "Manage character resources",
+      "Character library",
+      "Edit character",
       "Manage character avatar",
       "Nova (nova) · personal",
       "Import avatar file",
@@ -308,7 +349,8 @@ test("avatar changes create a personal override and refresh an active built-in c
   state.activate(await loadCharacter(locations.builtInRoot, "mira"));
   const harness = context({
     selections: [
-      "Manage character resources",
+      "Character library",
+      "Edit character",
       "Manage character avatar",
       "Mira (mira) · built-in",
       "Import avatar file",
@@ -342,7 +384,8 @@ test("keyboard menu creates and activates a declared missing preference form", a
   state.activate(await loadCharacter(locations.personalRoot, "nova"));
   const harness = context({
     selections: [
-      "Manage character resources",
+      "Character library",
+      "Edit character",
       "Manage preference forms",
       "Nova (nova) · personal",
       "1. Notes · missing · forms/notes.md",
@@ -375,7 +418,8 @@ test("editing a built-in preference form creates a personal override", async (t)
   const state = new IncarnateSessionState();
   const harness = context({
     selections: [
-      "Manage character resources",
+      "Character library",
+      "Edit character",
       "Manage preference forms",
       "Mira (mira) · built-in",
       "1. Notes · available · forms/notes.md",
@@ -399,8 +443,8 @@ test("character lifecycle menu renames an active personal character", async (t) 
   state.activate(await loadCharacter(locations.personalRoot, "nova"));
   const harness = context({
     selections: [
-      "Manage character resources",
-      "Rename, archive, or restore",
+      "Character library",
+      "Manage or export character",
       "Rename personal character",
       "Nova (nova)",
       "Close menu",
@@ -426,8 +470,8 @@ test("character lifecycle menu archives and restores without permanent deletion"
   let refreshes = 0;
   const archiveHarness = context({
     selections: [
-      "Manage character resources",
-      "Rename, archive, or restore",
+      "Character library",
+      "Manage or export character",
       "Archive personal character",
       "Nova (nova)",
       "Close menu",
@@ -441,8 +485,8 @@ test("character lifecycle menu archives and restores without permanent deletion"
 
   const restoreHarness = context({
     selections: [
-      "Manage character resources",
-      "Rename, archive, or restore",
+      "Character library",
+      "Add or restore character",
       "Restore archived character",
       "Nova (nova)",
       "Close menu",
@@ -461,8 +505,8 @@ test("restore menu reports an unsafe archive root without leaving the menu", asy
   const state = new IncarnateSessionState();
   const harness = context({
     selections: [
-      "Manage character resources",
-      "Rename, archive, or restore",
+      "Character library",
+      "Add or restore character",
       "Restore archived character",
       "Close menu",
     ],
@@ -479,8 +523,8 @@ test("character package menu exports and imports a built-in character as a perso
   const state = new IncarnateSessionState();
   const exportHarness = context({
     selections: [
-      "Manage character resources",
-      "Export or import character package",
+      "Character library",
+      "Manage or export character",
       "Export character package",
       "Mira (mira) · built-in",
       "Close menu",
@@ -495,8 +539,8 @@ test("character package menu exports and imports a built-in character as a perso
   let refreshes = 0;
   const importHarness = context({
     selections: [
-      "Manage character resources",
-      "Export or import character package",
+      "Character library",
+      "Add or restore character",
       "Import character package",
       "Close menu",
     ],

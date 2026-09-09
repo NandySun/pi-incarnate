@@ -50,5 +50,5 @@ export function composeMoodPrompt(config: MoodConfig, presetId: string | undefin
   if (!presetId) return undefined;
   const preset = config.presets.get(presetId);
   if (!preset) return undefined;
-  return `Current mood preset: ${preset.id}\n${preset.instruction}\nThe mood adjusts expression only; it does not override the character's identity, factual standards, or tool rules.`;
+  return `Current mood preset: ${preset.id}\nOnly this named preset is active; do not blend in other preset definitions from the character card.\n${preset.instruction}\nThe response must visibly demonstrate this preset; merely remaining compatible with it is not enough. Make it perceptible in wording, pacing, and response strategy without exaggerating it.\nThe mood adjusts expression only; it does not override the character's identity, factual standards, or tool rules.`;
 }

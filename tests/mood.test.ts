@@ -19,7 +19,12 @@ test("parses default and named mood presets", () => {
   const mood = parseMoodConfig(CARD);
   assert.equal(mood.defaultPreset, "warm");
   assert.deepEqual([...mood.presets.keys()], ["warm", "focused"]);
-  assert.match(composeMoodPrompt(mood, "focused") ?? "", /Lead with the conclusion/);
+  const prompt = composeMoodPrompt(mood, "focused") ?? "";
+  assert.match(prompt, /Lead with the conclusion/);
+  assert.match(prompt, /Only this named preset is active; do not blend in other preset definitions/);
+  assert.match(prompt, /must visibly demonstrate this preset/);
+  assert.match(prompt, /perceptible in wording, pacing, and response strategy without exaggerating/);
+  assert.match(prompt, /does not override the character's identity, factual standards, or tool rules/);
 });
 
 test("rejects a default mood that is not declared", () => {

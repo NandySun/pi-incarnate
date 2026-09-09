@@ -2,8 +2,15 @@
 
 All notable changes to this project are documented here.
 
-## Unreleased
+## 0.2.0 - Unreleased
 
+- Keep unselected keyboard-menu options readable across light/dark terminal mismatches by using the terminal foreground in bold instead of forcing a theme text color.
+- Add an eight-scenario persona evaluation plan and isolated real-Pi RPC runner with scenario filtering and repeated sampling.
+- Inject only the active mood preset at runtime instead of exposing every preset definition to the model, and make active mood expression explicit but bounded.
+- Refine Mira's playful preset toward shorter, higher-information conversational turns with a restrained visible playful cue.
+- Make the main menu state-aware and reorganize character resources into focused add/restore, edit, and manage/export groups while preserving all direct subcommands.
+- Add a real-entry companion integration gate covering both extension load orders, state transitions, protocol privacy, unknown versions, and missing-package degradation.
+- Remove the unused `claim-v1` event; the v1 UI protocol now consists only of request-state and state events.
 - Move all on-screen avatar presentation to the optional `pi-incarnate-ui` companion; core now only publishes sanitized character presentation data.
 - Add `auto`, `full`, `compact`, and `off` presentation preferences for companion UIs, all using the same avatar asset.
 - Add `avatar.ansi` support with a strict SGR color allowlist, per-line resets, a 64 KiB limit, and a 16-line display limit.

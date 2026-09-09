@@ -56,3 +56,15 @@ export function extractLevelTwoSections(markdown: string): MarkdownSection[] {
 export function findLevelTwoSection(markdown: string, name: string): string | undefined {
   return extractLevelTwoSections(markdown).find((section) => section.name.toLowerCase() === name.toLowerCase())?.content;
 }
+
+export function removeLevelTwoSection(markdown: string, name: string): string {
+  const { lines, headings } = findHeadings(markdown, 2);
+  const excluded = new Set<number>();
+  headings.forEach((heading, index) => {
+    if (heading.name.toLowerCase() !== name.toLowerCase()) return;
+    const end = headings[index + 1]?.line ?? lines.length;
+    for (let line = heading.line; line < end; line += 1) excluded.add(line);
+  });
+  if (excluded.size === 0) return markdown;
+  return lines.filter((_line, index) => !excluded.has(index)).join("\n").trim();
+}

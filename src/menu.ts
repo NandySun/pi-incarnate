@@ -46,6 +46,7 @@ import {
 } from "./character-section-editor.ts";
 import { readFormDraft, savePersonalForm } from "./form-editor.ts";
 import { discoverCharacters, isCharacterId, loadCharacter, type Character, type CharacterIssue } from "./character-loader.ts";
+import { confirmMenu, selectMenu } from "./select-menu.ts";
 import type { AvatarMode, IncarnateSessionState } from "./session-state.ts";
 
 export interface IncarnateMenuDependencies {
@@ -55,9 +56,10 @@ export interface IncarnateMenuDependencies {
 }
 
 type MainAction = "character" | "mood" | "avatar" | "manage" | "status" | "off" | "close";
-type ManageAction = "create" | "edit-sections" | "edit" | "repair" | "avatar-file" | "forms" | "lifecycle" | "bundle" | "back";
-type LifecycleAction = "rename" | "archive" | "restore" | "back";
-type BundleAction = "export" | "import" | "back";
+type ManageAction = "add" | "edit" | "organize" | "back";
+type AddAction = "create" | "repair" | "import" | "restore" | "back";
+type EditAction = "edit-sections" | "edit-complete" | "avatar-file" | "forms" | "back";
+type OrganizeAction = "rename" | "archive" | "export" | "back";
 
 const SOURCE_LABELS = { personal: "personal", "built-in": "built-in" } as const;
 
@@ -83,7 +85,7 @@ async function chooseCharacter(
     return undefined;
   }
   const labels = entries.map(({ character, source }) => `${character.name} (${character.id}) · ${SOURCE_LABELS[source]}`);
-  const selected = await ctx.ui.select(title, [...labels, "← Back"]);
+  const selected = await selectMenu(ctx, title, [...labels, "← Back"]);
   if (!selected || selected === "← Back") return undefined;
   return entries[labels.indexOf(selected)];
 }
@@ -108,7 +110,7 @@ async function chooseMood(ctx: ExtensionCommandContext, dependencies: IncarnateM
     return;
   }
   const labels = presets.map((preset) => `${preset.id}${preset.id === dependencies.state.currentMood ? " · active" : ""}`);
-  const selected = await ctx.ui.select(`Mood · ${active.name}`, [...labels, "← Back"]);
+  const selected = await selectMenu(ctx, `Mood · ${active.name}`, [...labels, "← Back"]);
   if (!selected || selected === "← Back") return;
   const preset = presets[labels.indexOf(selected)];
   if (!preset) return;
@@ -125,7 +127,7 @@ async function chooseAvatarMode(ctx: ExtensionCommandContext, dependencies: Inca
     { mode: "off", label: "Off · hide character UI" },
   ];
   const labels = options.map(({ mode, label }) => `${label}${mode === dependencies.state.avatarMode ? " · active" : ""}`);
-  const selected = await ctx.ui.select("Avatar mode", [...labels, "← Back"]);
+  const selected = await selectMenu(ctx, "Avatar mode", [...labels, "← Back"]);
   if (!selected || selected === "← Back") return;
   const option = options[labels.indexOf(selected)];
   if (!option) return;
@@ -197,7 +199,7 @@ async function createCharacter(ctx: ExtensionCommandContext, dependencies: Incar
   try {
     const character = await createPersonalCharacter(personalRoot, id, markdown);
     ctx.ui.notify(`Character created: ${character.name}\n${character.cardPath}`, "info");
-    if (await ctx.ui.confirm("Enable character?", `Use ${character.name} in this session now?`)) {
+    if (await confirmMenu(ctx, "Enable character?", `Use ${character.name} in this session now?`)) {
       dependencies.state.activate(character);
       await dependencies.onStateChange?.(ctx);
     }
@@ -223,7 +225,8 @@ async function editCharacter(ctx: ExtensionCommandContext, dependencies: Incarna
   const selected = await chooseCharacter(ctx, dependencies.locations, "Edit character card");
   if (!selected) return;
   if (selected.source === "built-in") {
-    const confirmed = await ctx.ui.confirm(
+    const confirmed = await confirmMenu(
+      ctx,
       "Create personal copy?",
       `${selected.character.name} is built in. Editing creates a personal override that survives package updates.`,
     );
@@ -251,7 +254,8 @@ async function editCharacterSections(
   const selected = await chooseCharacter(ctx, dependencies.locations, "Edit character sections");
   if (!selected) return;
   if (selected.source === "built-in") {
-    const confirmed = await ctx.ui.confirm(
+    const confirmed = await confirmMenu(
+      ctx,
       "Create personal copy?",
       `${selected.character.name} is built in. Editing creates a personal override that survives package updates.`,
     );
@@ -271,7 +275,7 @@ async function editCharacterSections(
       }),
       { action: "back", label: "← Back" },
     ];
-    const choice = await ctx.ui.select(`Character sections · ${selected.character.name}`, options.map((option) => option.label));
+    const choice = await selectMenu(ctx, `Character sections · ${selected.character.name}`, options.map((option) => option.label));
     if (!choice) return;
     const action = options.find((option) => option.label === choice)?.action;
     if (!action || action === "back") return;
@@ -320,7 +324,7 @@ async function repairCharacter(ctx: ExtensionCommandContext, dependencies: Incar
   }
 
   const labels = issues.map((issue) => `${issue.id} · ${issue.code}`);
-  const selected = await ctx.ui.select("Repair character card", [...labels, "← Back"]);
+  const selected = await selectMenu(ctx, "Repair character card", [...labels, "← Back"]);
   if (!selected || selected === "← Back") return;
   const issue = issues[labels.indexOf(selected)];
   if (!issue) return;
@@ -350,7 +354,8 @@ async function personalCharacterForResources(
   const personalRoot = dependencies.locations.personalRoot;
   if (!personalRoot) throw new CharacterEditError("Personal character storage is not configured");
   if (selected.source === "personal") return selected.character;
-  const confirmed = await ctx.ui.confirm(
+  const confirmed = await confirmMenu(
+    ctx,
     "Create personal copy?",
     `${selected.character.name} is built in. Avatar changes require a personal override that survives package updates.`,
   );
@@ -377,7 +382,7 @@ async function manageAvatarFile(ctx: ExtensionCommandContext, dependencies: Inca
   }
   const selected = await chooseCharacter(ctx, dependencies.locations, "Manage character avatar");
   if (!selected) return;
-  const action = await ctx.ui.select(`Avatar file · ${selected.character.name}`, [
+  const action = await selectMenu(ctx, `Avatar file · ${selected.character.name}`, [
     "Import avatar file",
     "Remove avatar file",
     "← Back",
@@ -398,7 +403,7 @@ async function manageAvatarFile(ctx: ExtensionCommandContext, dependencies: Inca
       return;
     }
 
-    const confirmed = await ctx.ui.confirm("Remove avatar?", `Remove the personal avatar for ${selected.character.name}?`);
+    const confirmed = await confirmMenu(ctx, "Remove avatar?", `Remove the personal avatar for ${selected.character.name}?`);
     if (!confirmed) return;
     const character = await personalCharacterForResources(ctx, dependencies, selected);
     if (!character) return;
@@ -425,7 +430,7 @@ async function manageForms(ctx: ExtensionCommandContext, dependencies: Incarnate
   const labels = selected.character.forms.map(
     (form, index) => `${index + 1}. ${form.label} · ${form.status} · ${form.declaredPath}`,
   );
-  const choice = await ctx.ui.select(`Preference forms · ${selected.character.name}`, [...labels, "← Back"]);
+  const choice = await selectMenu(ctx, `Preference forms · ${selected.character.name}`, [...labels, "← Back"]);
   if (!choice || choice === "← Back") return;
   const form = selected.character.forms[labels.indexOf(choice)];
   if (!form) return;
@@ -436,7 +441,8 @@ async function manageForms(ctx: ExtensionCommandContext, dependencies: Incarnate
 
   try {
     if (selected.source === "built-in") {
-      const confirmed = await ctx.ui.confirm(
+      const confirmed = await confirmMenu(
+        ctx,
         "Create personal copy?",
         `${selected.character.name} is built in. Form changes require a personal override that survives package updates.`,
       );
@@ -470,7 +476,7 @@ async function choosePersonalCharacter(
     return undefined;
   }
   const labels = characters.map((character) => `${character.name} (${character.id})`);
-  const selected = await ctx.ui.select(title, [...labels, "← Back"]);
+  const selected = await selectMenu(ctx, title, [...labels, "← Back"]);
   if (!selected || selected === "← Back") return undefined;
   return characters[labels.indexOf(selected)];
 }
@@ -496,7 +502,7 @@ async function renameCharacter(ctx: ExtensionCommandContext, dependencies: Incar
     ctx.ui.notify(`Character id already exists: ${nextId}`, "error");
     return;
   }
-  if (!(await ctx.ui.confirm("Rename character?", `${character.id} → ${nextId}`))) return;
+  if (!(await confirmMenu(ctx, "Rename character?", `${character.id} → ${nextId}`))) return;
   try {
     const renamed = await renamePersonalCharacter(personalRoot, character.id, nextId);
     if (dependencies.state.activeCharacter?.id === character.id) {
@@ -514,7 +520,7 @@ async function archiveCharacter(ctx: ExtensionCommandContext, dependencies: Inca
   if (!personalRoot) return;
   const character = await choosePersonalCharacter(ctx, dependencies.locations, "Archive personal character");
   if (!character) return;
-  if (!(await ctx.ui.confirm("Archive character?", `${character.name} will leave the active character list but can be restored.`))) return;
+  if (!(await confirmMenu(ctx, "Archive character?", `${character.name} will leave the active character list but can be restored.`))) return;
   try {
     const target = await archivePersonalCharacter(personalRoot, character.id);
     if (dependencies.state.activeCharacter?.id === character.id) {
@@ -543,39 +549,20 @@ async function restoreCharacter(ctx: ExtensionCommandContext, dependencies: Inca
     return;
   }
   const labels = characters.map((character) => `${character.name} (${character.id})`);
-  const selected = await ctx.ui.select("Restore archived character", [...labels, "← Back"]);
+  const selected = await selectMenu(ctx, "Restore archived character", [...labels, "← Back"]);
   if (!selected || selected === "← Back") return;
   const archived = characters[labels.indexOf(selected)];
   if (!archived) return;
   try {
     const restored = await restoreArchivedCharacter(personalRoot, archived.id);
     ctx.ui.notify(`Character restored: ${restored.name} (${restored.id})`, "info");
-    if (await ctx.ui.confirm("Enable character?", `Use ${restored.name} in this session now?`)) {
+    if (await confirmMenu(ctx, "Enable character?", `Use ${restored.name} in this session now?`)) {
       dependencies.state.activate(restored);
       await dependencies.onStateChange?.(ctx);
     }
   } catch (error) {
     ctx.ui.notify(errorMessage(error, "Failed to restore character"), "error");
   }
-}
-
-async function manageCharacterLifecycle(
-  ctx: ExtensionCommandContext,
-  dependencies: IncarnateMenuDependencies,
-): Promise<void> {
-  const options: Array<{ action: LifecycleAction; label: string }> = [
-    { action: "rename", label: "Rename personal character" },
-    { action: "archive", label: "Archive personal character" },
-    { action: "restore", label: "Restore archived character" },
-    { action: "back", label: "← Back" },
-  ];
-  const selected = await ctx.ui.select("Character lifecycle", options.map((option) => option.label));
-  if (!selected) return;
-  const action = options.find((option) => option.label === selected)?.action;
-  if (!action || action === "back") return;
-  if (action === "rename") await renameCharacter(ctx, dependencies);
-  if (action === "archive") await archiveCharacter(ctx, dependencies);
-  if (action === "restore") await restoreCharacter(ctx, dependencies);
 }
 
 async function exportCharacterBundle(
@@ -590,7 +577,8 @@ async function exportCharacterBundle(
   const availableForms = selected.character.forms.filter((form) => form.status === "available").length;
   try {
     const targetPath = resolveUserPath(input.trim() || filename, ctx.cwd);
-    const confirmed = await ctx.ui.confirm(
+    const confirmed = await confirmMenu(
+      ctx,
       "Export character package?",
       `Includes the character card, preferred avatar, and ${availableForms} available declared form(s). Preference forms may contain private information.`,
     );
@@ -619,7 +607,8 @@ async function importCharacterBundle(
   try {
     const sourcePath = resolveUserPath(input, ctx.cwd);
     const bundle = await prepareCharacterBundleImport(sourcePath);
-    const confirmed = await ctx.ui.confirm(
+    const confirmed = await confirmMenu(
+      ctx,
       "Import character package?",
       `${bundle.name} (${bundle.id}) · Avatar: ${bundle.avatar ? "included" : "none"} · Forms: ${bundle.forms.length}. Existing personal characters are never overwritten.`,
     );
@@ -629,7 +618,7 @@ async function importCharacterBundle(
     if (dependencies.state.activeCharacter?.id === character.id) {
       dependencies.state.activate(character);
       await dependencies.onStateChange?.(ctx);
-    } else if (await ctx.ui.confirm("Enable character?", `Use ${character.name} in this session now?`)) {
+    } else if (await confirmMenu(ctx, "Enable character?", `Use ${character.name} in this session now?`)) {
       dependencies.state.activate(character);
       await dependencies.onStateChange?.(ctx);
     }
@@ -638,21 +627,65 @@ async function importCharacterBundle(
   }
 }
 
-async function manageCharacterBundles(
+async function manageAddCharacter(
   ctx: ExtensionCommandContext,
   dependencies: IncarnateMenuDependencies,
 ): Promise<void> {
-  const options: Array<{ action: BundleAction; label: string }> = [
-    { action: "export", label: "Export character package" },
+  const options: Array<{ action: AddAction; label: string }> = [
+    { action: "create", label: "Create character card" },
+    { action: "repair", label: "Repair invalid character card" },
     { action: "import", label: "Import character package" },
+    { action: "restore", label: "Restore archived character" },
     { action: "back", label: "← Back" },
   ];
-  const selected = await ctx.ui.select("Portable character packages", options.map((option) => option.label));
+  const selected = await selectMenu(ctx, "Add or restore character", options.map((option) => option.label));
   if (!selected) return;
   const action = options.find((option) => option.label === selected)?.action;
   if (!action || action === "back") return;
-  if (action === "export") await exportCharacterBundle(ctx, dependencies);
+  if (action === "create") await createCharacter(ctx, dependencies);
+  if (action === "repair") await repairCharacter(ctx, dependencies);
   if (action === "import") await importCharacterBundle(ctx, dependencies);
+  if (action === "restore") await restoreCharacter(ctx, dependencies);
+}
+
+async function manageCharacterEditing(
+  ctx: ExtensionCommandContext,
+  dependencies: IncarnateMenuDependencies,
+): Promise<void> {
+  const options: Array<{ action: EditAction; label: string }> = [
+    { action: "edit-sections", label: "Edit character sections" },
+    { action: "edit-complete", label: "Edit complete character card" },
+    { action: "avatar-file", label: "Manage character avatar" },
+    { action: "forms", label: "Manage preference forms" },
+    { action: "back", label: "← Back" },
+  ];
+  const selected = await selectMenu(ctx, "Edit character", options.map((option) => option.label));
+  if (!selected) return;
+  const action = options.find((option) => option.label === selected)?.action;
+  if (!action || action === "back") return;
+  if (action === "edit-sections") await editCharacterSections(ctx, dependencies);
+  if (action === "edit-complete") await editCharacter(ctx, dependencies);
+  if (action === "avatar-file") await manageAvatarFile(ctx, dependencies);
+  if (action === "forms") await manageForms(ctx, dependencies);
+}
+
+async function manageCharacterOrganization(
+  ctx: ExtensionCommandContext,
+  dependencies: IncarnateMenuDependencies,
+): Promise<void> {
+  const options: Array<{ action: OrganizeAction; label: string }> = [
+    { action: "rename", label: "Rename personal character" },
+    { action: "archive", label: "Archive personal character" },
+    { action: "export", label: "Export character package" },
+    { action: "back", label: "← Back" },
+  ];
+  const selected = await selectMenu(ctx, "Manage or export character", options.map((option) => option.label));
+  if (!selected) return;
+  const action = options.find((option) => option.label === selected)?.action;
+  if (!action || action === "back") return;
+  if (action === "rename") await renameCharacter(ctx, dependencies);
+  if (action === "archive") await archiveCharacter(ctx, dependencies);
+  if (action === "export") await exportCharacterBundle(ctx, dependencies);
 }
 
 async function manageCharacterResources(
@@ -660,41 +693,38 @@ async function manageCharacterResources(
   dependencies: IncarnateMenuDependencies,
 ): Promise<void> {
   const options: Array<{ action: ManageAction; label: string }> = [
-    { action: "create", label: "Create character card" },
-    { action: "edit-sections", label: "Edit character sections" },
-    { action: "edit", label: "Edit complete character card" },
-    { action: "repair", label: "Repair invalid character card" },
-    { action: "avatar-file", label: "Manage character avatar" },
-    { action: "forms", label: "Manage preference forms" },
-    { action: "lifecycle", label: "Rename, archive, or restore" },
-    { action: "bundle", label: "Export or import character package" },
+    { action: "add", label: "Add or restore character" },
+    { action: "edit", label: "Edit character" },
+    { action: "organize", label: "Manage or export character" },
     { action: "back", label: "← Main menu" },
   ];
-  const selected = await ctx.ui.select("Character resources", options.map((option) => option.label));
+  const selected = await selectMenu(ctx, "Character library", options.map((option) => option.label));
   if (!selected) return;
   const action = options.find((option) => option.label === selected)?.action;
   if (!action || action === "back") return;
-  if (action === "create") await createCharacter(ctx, dependencies);
-  if (action === "edit-sections") await editCharacterSections(ctx, dependencies);
-  if (action === "edit") await editCharacter(ctx, dependencies);
-  if (action === "repair") await repairCharacter(ctx, dependencies);
-  if (action === "avatar-file") await manageAvatarFile(ctx, dependencies);
-  if (action === "forms") await manageForms(ctx, dependencies);
-  if (action === "lifecycle") await manageCharacterLifecycle(ctx, dependencies);
-  if (action === "bundle") await manageCharacterBundles(ctx, dependencies);
+  if (action === "add") await manageAddCharacter(ctx, dependencies);
+  if (action === "edit") await manageCharacterEditing(ctx, dependencies);
+  if (action === "organize") await manageCharacterOrganization(ctx, dependencies);
 }
 
 function mainActions(state: IncarnateSessionState): Array<{ action: MainAction; label: string }> {
   const active = state.activeCharacter;
-  return [
-    { action: "character", label: `Choose character${active ? ` · ${active.name}` : ""}` },
-    { action: "mood", label: `Choose mood${state.currentMood ? ` · ${state.currentMood}` : ""}` },
-    { action: "avatar", label: `Avatar mode · ${state.avatarMode}` },
-    { action: "manage", label: "Manage character resources" },
-    { action: "status", label: "Show status" },
-    { action: "off", label: "Disable active character" },
-    { action: "close", label: "Close menu" },
+  const actions: Array<{ action: MainAction; label: string }> = [
+    { action: "character", label: active ? `Change character · ${active.name}` : "Choose character" },
   ];
+  if (active?.mood.presets.size) {
+    actions.push({ action: "mood", label: `Choose mood${state.currentMood ? ` · ${state.currentMood}` : ""}` });
+  }
+  if (active) {
+    actions.push({ action: "avatar", label: `Avatar mode · ${state.avatarMode}` });
+  }
+  actions.push(
+    { action: "manage", label: "Character library" },
+    { action: "status", label: "Show status" },
+  );
+  if (active) actions.push({ action: "off", label: "Disable active character" });
+  actions.push({ action: "close", label: "Close menu" });
+  return actions;
 }
 
 export async function openIncarnateMenu(
@@ -703,7 +733,7 @@ export async function openIncarnateMenu(
 ): Promise<void> {
   while (true) {
     const options = mainActions(dependencies.state);
-    const selected = await ctx.ui.select("pi-incarnate", options.map((option) => option.label));
+    const selected = await selectMenu(ctx, "pi-incarnate", options.map((option) => option.label));
     if (!selected) return;
     const action = options.find((option) => option.label === selected)?.action;
     if (!action || action === "close") return;

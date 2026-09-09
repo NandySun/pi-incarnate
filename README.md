@@ -2,7 +2,7 @@
 
 让角色进入 Pi Agent 的对话现场：通过可编辑角色卡、稳定的人格层和会话内 mood，让非 coding 对话拥有更强的在场感，同时保留 Pi 原有工具、安全边界和任务完成能力。头像与状态显示由可选的 `pi-incarnate-ui` 配套扩展提供。
 
-最新 npm 版本为 `0.1.0`；当前 `main` 包含尚未发布的交互菜单和角色卡编辑功能。项目已在 Pi `0.85.0` 验证，要求 Node.js `>=22.19.0`。第一版不做世界书、自动长期记忆或隐式角色切换。
+最新 npm 版本仍为 `0.1.0`；当前工作区是尚未发布的 `0.2.0` 本地候选，包含交互菜单、角色资源管理、联合协议门禁和人格回归工具。项目已在 Pi `0.85.0` 验证，要求 Node.js `>=22.19.0`。当前版本不做世界书、自动长期记忆或隐式角色切换。
 
 ## 安装与启动
 
@@ -12,6 +12,24 @@
 npm install
 npm run verify
 ```
+
+同时检出同级目录 `/path/to/pi-incarnate-ui` 后，可运行真实双扩展协议门禁：
+
+```bash
+npm run test:companion
+```
+
+该测试加载两个仓库的真实扩展入口，覆盖两种加载顺序、状态切换和缺失另一端时的安全降级；它不让两个 npm 包产生运行时源码依赖。
+
+人格回归计划可离线检查；需要已登录的 Pi 模型提供方时，也可以采集真实响应，并对高方差场景重复采样：
+
+```bash
+npm run eval:persona
+npm run eval:persona -- --run --model openai-codex/gpt-5.6-luna --thinking low
+npm run eval:persona -- --run --scenario same-topic-focused,same-topic-playful --repeat 3
+```
+
+真实运行会为每个场景启动隔离的无会话 Pi RPC，不加载其他扩展、技能、上下文文件或工具。脚本只采集响应，不自动把主观评分伪装成确定性测试；评分基线记录在项目 Obsidian 文档中。
 
 临时加载扩展进行开发：
 
@@ -47,7 +65,7 @@ pi remove /path/to/pi-incarnate
 /incarnate
 ```
 
-使用 `↑` / `↓` 移动，`Enter` 选择，`Esc` 返回或关闭。菜单可以完成：
+使用 `↑` / `↓` 移动，`Enter` 选择，`Esc` 返回或关闭。选中项使用 Pi 的强调色，未选中项使用加粗的终端默认前景色，因此即使 Pi 主题与终端明暗设置不一致，也不会被强制成低对比度文字。菜单可以完成：
 
 - 选择或关闭角色。
 - 切换当前角色的 mood。
@@ -60,7 +78,7 @@ pi remove /path/to/pi-incarnate
 - 重命名、归档或恢复个人角色；归档可恢复，不提供永久删除入口。
 - 将角色卡、头像和已声明表单导出为可移植角色包，或从角色包安全导入。
 
-主菜单只保留角色选择、mood、头像模式、状态、关闭角色和 `Manage character resources`。角色卡、头像文件与偏好表单操作收在资源子菜单中，避免功能增加后主菜单持续变长。
+主菜单会根据当前状态精简：未启用角色时只显示角色选择、`Character library`、状态和关闭；启用后才显示 mood、头像模式与关闭角色。`Character library` 再分为 `Add or restore character`、`Edit character`、`Manage or export character` 三组，避免无效动作和长列表。
 
 原有子命令继续保留，适合熟悉命令后直接调用或编写脚本：
 
@@ -86,9 +104,9 @@ pi remove /path/to/pi-incarnate
 
 ## 编写角色卡
 
-推荐直接运行 `/incarnate`，选择 `Create character card`。先输入支持中文的角色显示名，再确认仅用于目录和命令的安全 ID；ID 留空会采用自动建议值，大写字母、空格和下划线会规范化。随后 Pi 会打开带完整结构的多行模板：`Enter` 保存，`Shift+Enter` 或 `Ctrl+J` 插入换行，`Ctrl+G` 可调用外部编辑器，`Esc` 取消且不写入文件。
+推荐运行 `/incarnate` → `Character library` → `Add or restore character` → `Create character card`。先输入支持中文的角色显示名，再确认仅用于目录和命令的安全 ID；ID 留空会采用自动建议值，大写字母、空格和下划线会规范化。随后 Pi 会打开带完整结构的多行模板：`Enter` 保存，`Shift+Enter` 或 `Ctrl+J` 插入换行，`Ctrl+G` 可调用外部编辑器，`Esc` 取消且不写入文件。
 
-日常调整推荐选择 `Edit character sections`。导航菜单可以只打开显示名、`Identity`、`Personality`、`Speech Style`、`Behavior`、`Current Mood` 或 `Tools and Forms`；不需要在整篇 Markdown 中寻找位置。每次只替换选中的标题或章节正文，代码围栏中的伪标题、其他自定义章节和未选择内容保持不变。缺少可选的 mood 或表单章节时会提供起始模板。章节正文不能新增一级或二级结构标题，三级 mood 标题仍可使用；需要调整标题顺序、增加自定义章节或进行大范围重构时，选择 `Edit complete character card`。保存前仍执行整张角色卡校验，失败时原文件不变。
+日常调整推荐进入 `Character library` → `Edit character` → `Edit character sections`。导航菜单可以只打开显示名、`Identity`、`Personality`、`Speech Style`、`Behavior`、`Current Mood` 或 `Tools and Forms`；不需要在整篇 Markdown 中寻找位置。每次只替换选中的标题或章节正文，代码围栏中的伪标题、其他自定义章节和未选择内容保持不变。缺少可选的 mood 或表单章节时会提供起始模板。章节正文不能新增一级或二级结构标题，三级 mood 标题仍可使用；需要调整标题顺序、增加自定义章节或进行大范围重构时，在同组选择 `Edit complete character card`。保存前仍执行整张角色卡校验，失败时原文件不变。
 
 个人角色保存在：
 
@@ -150,19 +168,19 @@ Default: warm
 
 扩展在正常角色加载和人格注入时只解析这些显式列表项并检查路径，不读取或缓存表单正文。绝对路径、`..` 穿越、目录以及解析到角色目录外的符号链接都会被标为无效。
 
-运行 `/incarnate` 并选择 `Manage preference forms`，可以打开已经声明且可用的 `.md` 表单，或从模板创建尚不存在的表单。只有用户明确选择编辑时才读取正文；编辑器限制为 256 KiB、有效 UTF-8、普通文件和角色目录内路径。编辑内置角色表单时会先创建个人覆盖副本，原包文件保持不变。新增表单声明可通过 `Edit character sections` 单独修改 `Tools and Forms` 章节。
+运行 `/incarnate` → `Character library` → `Edit character` → `Manage preference forms`，可以打开已经声明且可用的 `.md` 表单，或从模板创建尚不存在的表单。只有用户明确选择编辑时才读取正文；编辑器限制为 256 KiB、有效 UTF-8、普通文件和角色目录内路径。编辑内置角色表单时会先创建个人覆盖副本，原包文件保持不变。新增表单声明可通过同组的 `Edit character sections` 单独修改 `Tools and Forms` 章节。
 
 菜单保存角色卡前会执行与运行时相同的必需章节和 mood 校验。格式错误时保留原文件并显示原因；创建过程使用暂存目录，编辑过程使用同目录临时文件原子替换。
 
-如果个人角色卡已经损坏，运行 `/incarnate` 并选择 `Repair invalid character card`。菜单只列出目录 ID 安全、位于个人角色根目录内，且属于“卡片格式错误”或“缺少卡片”的项目。格式错误的 UTF-8 卡片会在原内容上编辑；缺少卡片时会提供完整模板。无效编码、符号链接和越界目录不会在 TUI 中打开。
+如果个人角色卡已经损坏，运行 `/incarnate` → `Character library` → `Add or restore character` → `Repair invalid character card`。菜单只列出目录 ID 安全、位于个人角色根目录内，且属于“卡片格式错误”或“缺少卡片”的项目。格式错误的 UTF-8 卡片会在原内容上编辑；缺少卡片时会提供完整模板。无效编码、符号链接和越界目录不会在 TUI 中打开。
 
-头像可以通过 `/incarnate` → `Manage character avatar` 导入或移除。选择角色后输入 `.ansi` 或 `.txt` 文件路径；支持绝对路径、相对当前工作目录的路径、`~/...`、`file://...`、成对引号和终端拖放常见的转义空格。导入内置角色时会先请求创建个人覆盖副本，包内资源不会被修改。
+头像可以通过 `/incarnate` → `Character library` → `Edit character` → `Manage character avatar` 导入或移除。选择角色后输入 `.ansi` 或 `.txt` 文件路径；支持绝对路径、相对当前工作目录的路径、`~/...`、`file://...`、成对引号和终端拖放常见的转义空格。导入内置角色时会先请求创建个人覆盖副本，包内资源不会被修改。
 
 `avatar.txt` 是纯文本格式，会去除 ANSI 和终端控制序列。`avatar.ansi` 用于彩色头像，存在时优先于 `avatar.txt`；它只保留标准色、256 色、24-bit 前景/背景色及 reset，光标移动、清屏、OSC、超链接和其他控制序列一律删除。两种格式都要求 UTF-8，最大 64 KiB、16 行、每行 48 个终端列。ANSI 每行会强制 reset，防止颜色泄漏到 Pi 界面。头像损坏或不可读时只降级为角色状态行，不会关闭已经启用的人格。
 
 菜单导入会把清理后的安全版本写入个人角色目录，并拒绝需要裁剪的资源，避免静默损失图像。导入一种格式会移除另一种格式，确保新头像立即生效；写入使用同目录临时文件替换。移除操作需要确认，只删除个人副本中的 `avatar.ansi` 和 `avatar.txt`。
 
-个人角色还可以通过 `/incarnate` → `Rename, archive, or restore` 管理生命周期。重命名只修改安全目录 ID，不改角色卡中的显示名；如果角色正在使用，会同步更新当前会话。归档会在确认后把完整角色目录移到：
+个人角色可以通过 `/incarnate` → `Character library` → `Manage or export character` 重命名或归档；恢复入口位于 `Add or restore character`。重命名只修改安全目录 ID，不改角色卡中的显示名；如果角色正在使用，会同步更新当前会话。归档会在确认后把完整角色目录移到：
 
 ```text
 ~/.pi/agent/pi-incarnate/archive/<character-id>/
@@ -172,7 +190,7 @@ Default: warm
 
 ## 迁移角色
 
-运行 `/incarnate` → `Export or import character package` 可以迁移角色。导出文件采用可审阅的版本化 JSON，后缀为：
+角色包导出位于 `/incarnate` → `Character library` → `Manage or export character`，导入位于 `Add or restore character`。导出文件采用可审阅的版本化 JSON，后缀为：
 
 ```text
 <character-id>.pi-character.json
@@ -188,7 +206,7 @@ Default: warm
 
 - `No valid characters found`：确认角色位于个人目录或包内 `characters/<id>/CHARACTER.md`，目录 ID 合法。
 - `missing required non-empty sections`：补齐四个必需的二级章节，并确保正文非空。
-- 个人角色因格式错误未出现在列表：打开 `/incarnate`，选择 `Repair invalid character card`；修复成功后会重新进入正常角色列表。
+- 个人角色因格式错误未出现在列表：打开 `/incarnate` → `Character library` → `Add or restore character` → `Repair invalid character card`；修复成功后会重新进入正常角色列表。
 - `Current Mood ...`：检查 `Default:`、三级标题 preset ID 和对应正文。
 - `Forms: n/m available`：运行 `/incarnate status` 后检查缺失文件；表单路径必须留在角色目录内。
 - 彩色头像不显示：文件名应为 `avatar.ansi` 并位于对应角色目录；任意 ANSI 动画、光标控制或终端命令不会被支持。
@@ -207,6 +225,7 @@ src/character-lifecycle.ts 个人角色重命名、可恢复归档与恢复
 src/character-bundle.ts   版本化角色包导出、验证与原子导入
 src/session-state.ts      当前 session 的角色/mood/avatar 状态
 src/persona.ts            有界人格 prompt 组合
+src/markdown.ts           识别 fenced code 的 Markdown 章节操作
 src/commands.ts           /incarnate 命令
 src/menu.ts               键盘导航菜单与角色卡编辑流程
 src/avatar.ts             ASCII/ANSI 头像读取与安全清理
@@ -216,6 +235,8 @@ src/mood.ts               mood 预设解析和 prompt 片段
 src/forms.ts              表单声明解析与路径边界校验
 characters/mira/          原创示例角色与三份空白表单
 tests/                    Node 原生测试
+evals/                    人格、真实性与 mood 对照场景
+scripts/persona-eval.mjs  隔离 Pi RPC 的可重复行为采样
 ```
 
 发布前运行完整检查：

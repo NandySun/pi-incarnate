@@ -9,7 +9,7 @@ const character: Character = {
   name: "Mira",
   directory: "/characters/mira",
   cardPath: "/characters/mira/CHARACTER.md",
-  markdown: "# Mira\n\n## Identity\nArchivist",
+  markdown: "# Mira\n\n## Identity\nArchivist\n\n## Current Mood\nDefault: focused\n\n### warm\nBe patient.\n\n### focused\nLead with the conclusion.\n\n## Custom Notes\nKeep this section.",
   mood: {
     defaultPreset: "focused",
     presets: new Map([["focused", { id: "focused", instruction: "Lead with the conclusion." }]]),
@@ -35,6 +35,8 @@ test("persona prompt includes runtime boundaries and the complete card", () => {
   assert.match(prompt, /Preserve Pi's existing tools, permissions, safety rules/);
   assert.match(prompt, /Never invent tool results/);
   assert.match(prompt, /<character-card>[\s\S]*# Mira[\s\S]*<\/character-card>/);
+  assert.match(prompt, /## Custom Notes\nKeep this section/);
+  assert.doesNotMatch(prompt, /## Current Mood|### warm|Be patient/);
 });
 
 test("persona layer is appended without replacing the Pi prompt", () => {
@@ -42,5 +44,7 @@ test("persona layer is appended without replacing the Pi prompt", () => {
   assert.ok(prompt.startsWith("BASE SYSTEM PROMPT\n\n"));
   assert.match(prompt, /Active character: Mira \(mira\)/);
   assert.match(prompt, /Current mood preset: focused/);
+  assert.match(prompt, /Lead with the conclusion/);
+  assert.doesNotMatch(prompt, /### warm|Be patient/);
   assert.match(prompt, /forms\/games\.md \(available\)/);
 });
