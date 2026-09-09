@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here.
 
-## 0.2.0 - Unreleased
+## 0.2.0 - 2026-09-09
 
 - Keep unselected keyboard-menu options readable across light/dark terminal mismatches by using the terminal foreground in bold instead of forcing a theme text color.
 - Add an eight-scenario persona evaluation plan and isolated real-Pi RPC runner with scenario filtering and repeated sampling.
