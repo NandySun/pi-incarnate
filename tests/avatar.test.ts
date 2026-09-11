@@ -9,11 +9,17 @@ import { visibleWidth } from "@earendil-works/pi-tui";
 import type { Character } from "../src/character-loader.ts";
 import {
   AVATAR_MAX_BYTES,
+  AVATAR_PNG_MAX_DIMENSION,
   AvatarLoadError,
   loadAvatar,
   sanitizeAnsiAvatar,
   sanitizeAvatar,
 } from "../src/avatar.ts";
+
+const PNG_1X1 = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  "base64",
+);
 
 const character = {
   id: "mira",
@@ -81,6 +87,41 @@ test("loadAvatar prefers avatar.ansi over avatar.txt", async (t) => {
   const loaded = await loadAvatar(target);
 
   assert.match(loaded?.lines[0] ?? "", /\u001b\[38;2;1;2;3mcolor/);
+});
+
+test("loadAvatar combines a PNG primary avatar with the preferred text fallback", async (t) => {
+  const target = await avatarCharacter(t);
+  await writeFile(join(target.directory, "avatar.png"), PNG_1X1);
+  await writeFile(join(target.directory, "avatar.txt"), "plain\n");
+  await writeFile(join(target.directory, "avatar.ansi"), "\u001b[31mcolor\u001b[0m\n");
+
+  const loaded = await loadAvatar(target);
+
+  assert.equal(loaded?.image?.mimeType, "image/png");
+  assert.deepEqual({ width: loaded?.image?.widthPx, height: loaded?.image?.heightPx }, { width: 1, height: 1 });
+  assert.match(loaded?.lines[0] ?? "", /color/);
+});
+
+test("loadAvatar supports PNG-only avatars and rejects unsafe dimensions", async (t) => {
+  const target = await avatarCharacter(t);
+  await writeFile(join(target.directory, "avatar.png"), PNG_1X1);
+  const loaded = await loadAvatar(target);
+  assert.deepEqual(loaded?.lines, []);
+  assert.equal(loaded?.image?.bytes, PNG_1X1.byteLength);
+
+  const oversized = Buffer.from(PNG_1X1);
+  oversized.writeUInt32BE(AVATAR_PNG_MAX_DIMENSION + 1, 16);
+  await writeFile(join(target.directory, "avatar.png"), oversized);
+  await assert.rejects(loadAvatar(target), AvatarLoadError);
+});
+
+test("loadAvatar rejects corrupted PNG chunk checksums", async (t) => {
+  const target = await avatarCharacter(t);
+  const corrupted = Buffer.from(PNG_1X1);
+  corrupted[29] = corrupted[29]! ^ 0xff;
+  await writeFile(join(target.directory, "avatar.png"), corrupted);
+
+  await assert.rejects(loadAvatar(target), /invalid IHDR checksum/);
 });
 
 test("loadAvatar rejects oversized avatar files", async (t) => {

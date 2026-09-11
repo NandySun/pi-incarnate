@@ -12,6 +12,7 @@ import {
 
 const agentRoot = mkdtempSync(join(tmpdir(), "pi-incarnate-companion-"));
 const personalCharacterRoot = join(agentRoot, "pi-incarnate", "characters", "example");
+const pngCharacterRoot = join(agentRoot, "pi-incarnate", "characters", "png-example");
 mkdirSync(personalCharacterRoot, { recursive: true });
 writeFileSync(
   join(personalCharacterRoot, "CHARACTER.md"),
@@ -40,6 +41,38 @@ Lead with the result.
 `,
 );
 writeFileSync(join(personalCharacterRoot, "avatar.txt"), "EXAMPLE");
+mkdirSync(pngCharacterRoot, { recursive: true });
+writeFileSync(
+  join(pngCharacterRoot, "CHARACTER.md"),
+  `# PNG Example
+
+## Identity
+PNG integration fixture.
+
+## Personality
+Steady and observant.
+
+## Speech Style
+Concise.
+
+## Behavior
+Honest about uncertainty.
+
+## Current Mood
+Default: calm
+
+### calm
+Use an even tone.
+`,
+);
+writeFileSync(
+  join(pngCharacterRoot, "avatar.png"),
+  Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+    "base64",
+  ),
+);
+writeFileSync(join(pngCharacterRoot, "avatar.txt"), "PNG-FALLBACK");
 process.env.PI_CODING_AGENT_DIR = agentRoot;
 after(() => rmSync(agentRoot, { recursive: true, force: true }));
 
@@ -100,7 +133,10 @@ function createHarness(order) {
       renders += 1;
     },
   };
-  const theme = { fg: (_color, text) => text };
+  const theme = {
+    fg: (_color, value) => value,
+    bold: (value) => `\u001b[1m${value}\u001b[22m`,
+  };
   const footerData = {
     getGitBranch: () => "main",
     getExtensionStatuses: () => new Map([["example", "ready"]]),
@@ -213,13 +249,30 @@ for (const order of [
     assert.match(harness.render().join("\n"), /calm/);
     assert.equal(harness.states.at(-1).character.source, "personal");
 
+    await harness.command("incarnate", "use png-example");
+    const pngState = harness.states.at(-1);
+    assert.equal(uiProtocol.isIncarnateUiStateV1(pngState), true);
+    assert.equal(pngState.character.id, "png-example");
+    assert.deepEqual(pngState.avatar.lines, ["PNG-FALLBACK"]);
+    assert.deepEqual(
+      {
+        mimeType: pngState.avatar.image.mimeType,
+        widthPx: pngState.avatar.image.widthPx,
+        heightPx: pngState.avatar.image.heightPx,
+        bytes: pngState.avatar.image.bytes,
+      },
+      { mimeType: "image/png", widthPx: 1, heightPx: 1, bytes: 68 },
+    );
+    assert.equal(Buffer.from(pngState.avatar.image.data, "base64").byteLength, 68);
+    assert.doesNotMatch(JSON.stringify(pngState), /cardPath|markdown|CHARACTER\.md|\/home\//);
+
     await harness.command("incarnate", "avatar compact");
     assert.equal(harness.render().length, 3);
 
     const metricsBeforeUnknown = harness.metrics();
     harness.events.emit(UI_STATE_EVENT, { version: 2, active: false, avatarMode: "off" });
     assert.deepEqual(harness.metrics(), metricsBeforeUnknown);
-    assert.match(harness.render().join("\n"), /Example Character/);
+    assert.match(harness.render().join("\n"), /PNG Example/);
 
     await harness.command("incarnate", "avatar off");
     assert.equal(harness.metrics().footerClears, 1);

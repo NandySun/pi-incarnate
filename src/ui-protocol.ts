@@ -26,6 +26,13 @@ export interface IncarnateUiStateV1 {
     width: number;
     height: number;
     truncated: boolean;
+    image?: {
+      mimeType: "image/png";
+      data: string;
+      widthPx: number;
+      heightPx: number;
+      bytes: number;
+    };
   };
 }
 
@@ -60,6 +67,7 @@ export function createUiStateSnapshot(
       width: avatar.lines.reduce((maximum, line) => Math.max(maximum, visibleWidth(line)), 0),
       height: avatar.lines.length,
       truncated: avatar.truncated,
+      ...(avatar.image ? { image: { ...avatar.image } } : {}),
     };
   }
   return snapshot;

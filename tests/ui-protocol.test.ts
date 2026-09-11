@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { sanitizeAnsiAvatar } from "../src/avatar.ts";
+import { sanitizeAnsiAvatar, validatePngAvatar } from "../src/avatar.ts";
 import type { Character } from "../src/character-loader.ts";
 import { IncarnateSessionState } from "../src/session-state.ts";
 import { createUiStateSnapshot, isUiProtocolV1 } from "../src/ui-protocol.ts";
@@ -53,6 +53,28 @@ test("inactive snapshots contain no character or avatar data", () => {
   );
 
   assert.deepEqual(snapshot, { version: 1, active: false, avatarMode: "auto" });
+});
+
+test("adds bounded PNG data without changing the v1 envelope", () => {
+  const state = new IncarnateSessionState();
+  state.activate(character);
+  const avatar = {
+    ...sanitizeAnsiAvatar("fallback"),
+    image: validatePngAvatar(Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+      "base64",
+    )),
+  };
+
+  const snapshot = createUiStateSnapshot(state, { builtInRoot: "/built-in", personalRoot: "/personal" }, avatar);
+
+  assert.equal(snapshot.version, 1);
+  assert.equal(snapshot.avatar?.image?.mimeType, "image/png");
+  assert.deepEqual(
+    { width: snapshot.avatar?.image?.widthPx, height: snapshot.avatar?.image?.heightPx },
+    { width: 1, height: 1 },
+  );
+  assert.deepEqual(snapshot.avatar?.lines, ["fallback"]);
 });
 
 test("recognizes only the v1 protocol envelope", () => {

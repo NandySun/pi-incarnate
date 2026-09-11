@@ -13,4 +13,4 @@ Every character directory must contain a UTF-8 `CHARACTER.md` with a level-one c
 
 Optional sections such as `Tools and Forms` and `Current Mood` are preserved verbatim and become part of the persona prompt. Declared forms and mood presets are validated by their dedicated loaders.
 
-An optional `avatar.txt` provides a plain UTF-8 avatar. An optional `avatar.ansi` takes precedence and may use only safe SGR foreground/background colors and resets. Both formats are limited to 64 KiB, 16 lines, and 48 visible columns.
+An optional `avatar.png` is the primary avatar on terminals with supported inline-image protocols. It is limited to 512 KiB, 2048 px per dimension, and 4,194,304 total pixels, with PNG structure and chunk checksums validated by the core extension. An optional `avatar.ansi` or `avatar.txt` provides the terminal-compatible fallback; ANSI takes precedence over plain text and may use only safe SGR foreground/background colors and resets. Both text formats are limited to 64 KiB, 16 lines, and 48 visible columns.

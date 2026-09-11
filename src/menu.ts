@@ -391,7 +391,7 @@ async function manageAvatarFile(ctx: ExtensionCommandContext, dependencies: Inca
 
   try {
     if (action === "Import avatar file") {
-      const input = await ctx.ui.input("Avatar file", "path to a .ansi or .txt file; drag and drop is supported");
+      const input = await ctx.ui.input("Avatar file", "path to a .png, .ansi, or .txt file; drag and drop is supported");
       if (!input?.trim()) return;
       const sourcePath = resolveAvatarSourcePath(input, ctx.cwd);
       const prepared = await prepareAvatarImport(sourcePath);
@@ -399,7 +399,8 @@ async function manageAvatarFile(ctx: ExtensionCommandContext, dependencies: Inca
       if (!character) return;
       const targetPath = await installPersonalAvatar(personalRoot, character.id, prepared);
       await refreshEditedCharacter(ctx, dependencies, character);
-      ctx.ui.notify(`Avatar imported: ${prepared.width}×${prepared.height}\n${targetPath}`, "info");
+      const unit = prepared.kind === "png" ? "px" : "cells";
+      ctx.ui.notify(`Avatar imported: ${prepared.width}×${prepared.height} ${unit}\n${targetPath}`, "info");
       return;
     }
 
@@ -610,7 +611,7 @@ async function importCharacterBundle(
     const confirmed = await confirmMenu(
       ctx,
       "Import character package?",
-      `${bundle.name} (${bundle.id}) · Avatar: ${bundle.avatar ? "included" : "none"} · Forms: ${bundle.forms.length}. Existing personal characters are never overwritten.`,
+      `${bundle.name} (${bundle.id}) · Avatar: ${bundle.avatars.length > 0 ? "included" : "none"} · Forms: ${bundle.forms.length}. Existing personal characters are never overwritten.`,
     );
     if (!confirmed) return;
     const character = await installCharacterBundle(personalRoot, bundle);

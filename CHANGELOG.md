@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here.
 
+## Unreleased
+
+## 0.3.0 - 2026-09-11
+
+- Add validated `avatar.png` primary avatars with bounded dimensions and file size, while retaining one `avatar.ansi` or `avatar.txt` fallback.
+- Carry PNG avatars through personal import/removal, portable v1 character packages, and the backward-compatible v1 companion UI snapshot.
+
 ## 0.2.0 - 2026-09-09
 
 - Keep unselected keyboard-menu options readable across light/dark terminal mismatches by using the terminal foreground in bold instead of forcing a theme text color.

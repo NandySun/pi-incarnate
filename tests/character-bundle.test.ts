@@ -27,7 +27,12 @@ function card(name = "Example Character"): string {
   );
 }
 
-function document(id: string, files: Array<{ path: string; content: string }>): string {
+const PNG_1X1 = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  "base64",
+);
+
+function document(id: string, files: Array<{ path: string; content: string; encoding?: "base64" }>): string {
   return `${JSON.stringify({ format: CHARACTER_BUNDLE_FORMAT, version: 1, id, files }, null, 2)}\n`;
 }
 
@@ -59,6 +64,27 @@ test("exports and imports the card, preferred avatar, and available declared for
   assert.match(await readFile(join(targetRoot, "example", "avatar.ansi"), "utf8"), /\u001b\[31mface/);
   await assert.rejects(readFile(join(targetRoot, "example", "avatar.txt"), "utf8"));
   assert.equal(await readFile(join(targetRoot, "example", "forms", "notes.md"), "utf8"), "# Notes\n\nPortable.\n");
+});
+
+test("round-trips a PNG primary avatar together with an ANSI fallback", async (t) => {
+  const root = await workspace(t);
+  const sourceRoot = join(root, "source");
+  const targetRoot = join(root, "target");
+  await createPersonalCharacter(sourceRoot, "example", card());
+  await writeFile(join(sourceRoot, "example", "avatar.png"), PNG_1X1);
+  await writeFile(join(sourceRoot, "example", "avatar.ansi"), "\u001b[31mfallback\u001b[0m\n");
+  const bundlePath = join(root, "example.pi-character.json");
+
+  await writeCharacterBundle(await loadCharacter(sourceRoot, "example"), bundlePath);
+  const raw = JSON.parse(await readFile(bundlePath, "utf8")) as { files: Array<Record<string, unknown>> };
+  const pngEntry = raw.files.find((entry) => entry.path === "avatar.png");
+  assert.equal(pngEntry?.encoding, "base64");
+
+  const imported = await prepareCharacterBundleImport(bundlePath);
+  assert.equal(imported.avatars.length, 2);
+  await installCharacterBundle(targetRoot, imported);
+  assert.deepEqual(await readFile(join(targetRoot, "example", "avatar.png")), PNG_1X1);
+  assert.match(await readFile(join(targetRoot, "example", "avatar.ansi"), "utf8"), /fallback/);
 });
 
 test("refuses to overwrite an export or an existing personal character", async (t) => {
@@ -129,6 +155,20 @@ test("rejects traversal, duplicate paths, undeclared files, and multiple avatars
   for (const [index, files] of cases.entries()) {
     const path = join(root, `invalid-${index}.pi-character.json`);
     await writeFile(path, document("example", files));
+    await assert.rejects(prepareCharacterBundleImport(path), CharacterEditError);
+  }
+});
+
+test("rejects malformed or incorrectly encoded PNG bundle entries", async (t) => {
+  const root = await workspace(t);
+  const cases = [
+    { path: "avatar.png", content: "not base64", encoding: "base64" as const },
+    { path: "avatar.png", content: PNG_1X1.toString("base64") },
+    { path: "avatar.txt", content: Buffer.from("plain\n").toString("base64"), encoding: "base64" as const },
+  ];
+  for (const [index, avatar] of cases.entries()) {
+    const path = join(root, `bad-png-${index}.pi-character.json`);
+    await writeFile(path, document("example", [{ path: "CHARACTER.md", content: card() }, avatar]));
     await assert.rejects(prepareCharacterBundleImport(path), CharacterEditError);
   }
 });

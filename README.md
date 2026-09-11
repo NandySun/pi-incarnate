@@ -2,7 +2,7 @@
 
 让角色进入 Pi Agent 的对话现场：通过可编辑角色卡、稳定的人格层和会话内 mood，让非 coding 对话拥有更强的在场感，同时保留 Pi 原有工具、安全边界和任务完成能力。头像与状态显示由可选的 `pi-incarnate-ui` 配套扩展提供。
 
-最新 npm 版本为 `0.2.0`，包含交互菜单、角色资源管理、联合协议门禁和人格回归工具。项目已在 Pi `0.85.0` 验证，要求 Node.js `>=22.19.0`。当前版本不做世界书、自动长期记忆或隐式角色切换。
+最新已发布 npm 版本为 `0.2.0`；当前工作区候选版本为 `0.3.0`，新增 PNG 主头像及 ANSI/TXT 兼容回退。项目已在 Pi `0.85.0` 验证，要求 Node.js `>=22.19.0`。当前版本不做世界书、自动长期记忆或隐式角色切换。
 
 ## 安装与启动
 
@@ -120,8 +120,9 @@ pi remove /path/to/pi-incarnate
 characters/
 └── my-character/
     ├── CHARACTER.md
+    ├── avatar.png          # 可选，支持终端图片协议时作为主头像
     ├── avatar.txt          # 可选，纯文本头像
-    ├── avatar.ansi         # 可选，受限 ANSI 真彩头像；优先于 avatar.txt
+    ├── avatar.ansi         # 可选，受限 ANSI 真彩回退；优先于 avatar.txt
     └── forms/              # 可选
 ```
 
@@ -172,11 +173,13 @@ Default: warm
 
 如果个人角色卡已经损坏，运行 `/incarnate` → `Character library` → `Add or restore character` → `Repair invalid character card`。菜单只列出目录 ID 安全、位于个人角色根目录内，且属于“卡片格式错误”或“缺少卡片”的项目。格式错误的 UTF-8 卡片会在原内容上编辑；缺少卡片时会提供完整模板。无效编码、符号链接和越界目录不会在 TUI 中打开。
 
-头像可以通过 `/incarnate` → `Character library` → `Edit character` → `Manage character avatar` 导入或移除。选择角色后输入 `.ansi` 或 `.txt` 文件路径；支持绝对路径、相对当前工作目录的路径、`~/...`、`file://...`、成对引号和终端拖放常见的转义空格。导入内置角色时会先请求创建个人覆盖副本，包内资源不会被修改。
+头像可以通过 `/incarnate` → `Character library` → `Edit character` → `Manage character avatar` 导入或移除。选择角色后输入 `.png`、`.ansi` 或 `.txt` 文件路径；支持绝对路径、相对当前工作目录的路径、`~/...`、`file://...`、成对引号和终端拖放常见的转义空格。导入内置角色时会先请求创建个人覆盖副本，包内资源不会被修改。
 
-`avatar.txt` 是纯文本格式，会去除 ANSI 和终端控制序列。`avatar.ansi` 用于彩色头像，存在时优先于 `avatar.txt`；它只保留标准色、256 色、24-bit 前景/背景色及 reset，光标移动、清屏、OSC、超链接和其他控制序列一律删除。两种格式都要求 UTF-8，最大 64 KiB、16 行、每行 48 个终端列。ANSI 每行会强制 reset，防止颜色泄漏到 Pi 界面。头像损坏或不可读时只降级为角色状态行，不会关闭已经启用的人格。
+`avatar.png` 是主头像。支持 Kitty 或 iTerm2 图片协议时，`pi-incarnate-ui` 会按 PNG 像素尺寸和终端 cell 尺寸等比缩放；不支持图片、图片被 Pi 禁用或渲染失败时，自动回退到 `avatar.ansi`，其次是 `avatar.txt`。只有 PNG 而无法显示图片时使用紧凑角色状态，不影响人格。PNG 最大 512 KiB，宽高各不超过 2048 px，总像素不超过 4,194,304；导入时检查 PNG 签名、chunk checksum、IHDR、必要数据块和尺寸。
 
-菜单导入会把清理后的安全版本写入个人角色目录，并拒绝需要裁剪的资源，避免静默损失图像。导入一种格式会移除另一种格式，确保新头像立即生效；写入使用同目录临时文件替换。移除操作需要确认，只删除个人副本中的 `avatar.ansi` 和 `avatar.txt`。
+`avatar.txt` 是纯文本格式，会去除 ANSI 和终端控制序列。`avatar.ansi` 用于彩色回退，存在时优先于 `avatar.txt`；它只保留标准色、256 色、24-bit 前景/背景色及 reset，光标移动、清屏、OSC、超链接和其他控制序列一律删除。两种文本格式都要求 UTF-8，最大 64 KiB、16 行、每行 48 个终端列。ANSI 每行会强制 reset，防止颜色泄漏到 Pi 界面。头像损坏或不可读时只降级为角色状态行，不会关闭已经启用的人格。
+
+菜单导入会把验证或清理后的安全版本写入个人角色目录，并拒绝超出边界或需要裁剪的资源。导入 PNG 会保留已有文本回退；导入 ANSI/TXT 会互相替换但保留 PNG 主图。写入使用同目录临时文件替换。移除操作需要确认，并删除个人副本中的 `avatar.png`、`avatar.ansi` 和 `avatar.txt`。
 
 个人角色可以通过 `/incarnate` → `Character library` → `Manage or export character` 重命名或归档；恢复入口位于 `Add or restore character`。重命名只修改安全目录 ID，不改角色卡中的显示名；如果角色正在使用，会同步更新当前会话。归档会在确认后把完整角色目录移到：
 
@@ -194,11 +197,11 @@ Default: warm
 <character-id>.pi-character.json
 ```
 
-导出只收集 `CHARACTER.md`、运行时优先使用的一个头像，以及角色卡中已经声明且当前可用的 Markdown 表单。未知文件、未声明文件、缺失或无效表单和被另一格式遮蔽的头像不会进入角色包。确认界面会显示实际包含的头像和表单数量；偏好表单可能包含私人信息，分享前应直接打开 JSON 检查。
+导出只收集 `CHARACTER.md`、可用的 PNG 主头像、一个运行时优先的 ANSI/TXT 回退，以及角色卡中已经声明且当前可用的 Markdown 表单。PNG 在 JSON 中使用显式 base64 编码；旧的纯文本 v1 角色包仍可导入。未知文件、未声明文件、缺失或无效表单和被另一文本格式遮蔽的头像不会进入角色包。确认界面会显示实际包含的头像和表单数量；偏好表单可能包含私人信息，分享前应直接打开 JSON 检查。
 
-导入会先检查格式版本、安全 ID、UTF-8、文件数量与总大小、角色卡结构、头像安全边界，以及每份表单是否由卡片明确声明。路径穿越、重复路径、未知文件、符号链接来源和同时包含两个头像的包都会被拒绝。整个角色先在个人目录内的临时位置完成构建和加载，再整体移动到正式位置；不会覆盖已有个人角色。同 ID 只有内置角色时，导入结果会成为个人覆盖副本。导入成功后可选择立即启用。
+导入会先检查格式版本、安全 ID、UTF-8/base64、文件数量与总大小、角色卡结构、头像安全边界，以及每份表单是否由卡片明确声明。路径穿越、重复路径、未知文件、符号链接来源、多个 PNG 或多个文本回退都会被拒绝。整个角色先在个人目录内的临时位置完成构建和加载，再整体移动到正式位置；不会覆盖已有个人角色。同 ID 只有内置角色时，导入结果会成为个人覆盖副本。导入成功后可选择立即启用。
 
-角色包最大 1 MiB、最多 66 个文件；其中角色卡最大 512 KiB，表单和头像继续沿用各自的 256 KiB 与 64 KiB 限制。导出目标和导入来源支持与头像导入相同的绝对路径、相对路径、`~/...`、`file://...`、引号和转义空格输入。导出不会覆盖已有文件。
+角色包最大 1 MiB、最多 66 个文件；其中角色卡最大 512 KiB，表单、文本头像和 PNG 分别沿用 256 KiB、64 KiB 和 512 KiB 限制。导出目标和导入来源支持与头像导入相同的绝对路径、相对路径、`~/...`、`file://...`、引号和转义空格输入。导出不会覆盖已有文件。
 
 ## 故障排查
 
@@ -208,6 +211,7 @@ Default: warm
 - `Current Mood ...`：检查 `Default:`、三级标题 preset ID 和对应正文。
 - `Forms: n/m available`：运行 `/incarnate status` 后检查缺失文件；表单路径必须留在角色目录内。
 - 彩色头像不显示：文件名应为 `avatar.ansi` 并位于对应角色目录；任意 ANSI 动画、光标控制或终端命令不会被支持。
+- PNG 头像不显示：确认同时安装 `pi-incarnate-ui`，并使用 Kitty、Ghostty、WezTerm 或 iTerm2 等已启用图片协议的终端；不支持时会自动使用 `avatar.ansi`/`avatar.txt` 回退。
 - 命令没有出现：开发时确认使用 `pi -e ./extensions/index.ts`；本地安装后可用 `pi list` 和 `pi config` 检查资源状态。
 - 项目本地扩展未加载：Pi 只从受信任项目自动加载 `.pi/extensions`；本项目的显式 `-e` 和本地包安装不依赖该目录。
 
@@ -226,7 +230,7 @@ src/persona.ts            有界人格 prompt 组合
 src/markdown.ts           识别 fenced code 的 Markdown 章节操作
 src/commands.ts           /incarnate 命令
 src/menu.ts               键盘导航菜单与角色卡编辑流程
-src/avatar.ts             ASCII/ANSI 头像读取与安全清理
+src/avatar.ts             PNG 校验、ASCII/ANSI 头像读取与安全清理
 src/avatar-manager.ts     头像路径解析、安全导入与移除
 src/form-editor.ts        偏好表单有界读取与原子编辑
 src/mood.ts               mood 预设解析和 prompt 片段

@@ -12,6 +12,11 @@ import {
 } from "../src/avatar-manager.ts";
 import { CharacterEditError } from "../src/character-editor.ts";
 
+const PNG_1X1 = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  "base64",
+);
+
 async function workspace(t: TestContext): Promise<{ root: string; personalRoot: string; characterDirectory: string }> {
   const root = join(tmpdir(), `pi-incarnate-avatar-manager-${crypto.randomUUID()}`);
   const personalRoot = join(root, "personal");
@@ -43,6 +48,35 @@ test("imports a sanitized ANSI avatar and replaces the alternate format", async 
   assert.deepEqual({ width: prepared.width, height: prepared.height }, { width: 4, height: 1 });
 });
 
+test("imports PNG as the primary avatar without deleting the text fallback", async (t) => {
+  const { root, personalRoot, characterDirectory } = await workspace(t);
+  const source = join(root, "portrait.png");
+  await writeFile(source, PNG_1X1);
+  await writeFile(join(characterDirectory, "avatar.ansi"), "fallback\n");
+
+  const prepared = await prepareAvatarImport(source);
+  const target = await installPersonalAvatar(personalRoot, "example", prepared);
+
+  assert.equal(prepared.kind, "png");
+  assert.equal(target, join(characterDirectory, "avatar.png"));
+  assert.deepEqual(await readFile(target), PNG_1X1);
+  assert.equal(await readFile(join(characterDirectory, "avatar.ansi"), "utf8"), "fallback\n");
+});
+
+test("replacing a text fallback preserves the PNG primary avatar", async (t) => {
+  const { root, personalRoot, characterDirectory } = await workspace(t);
+  const source = join(root, "portrait.txt");
+  await writeFile(source, "new fallback\n");
+  await writeFile(join(characterDirectory, "avatar.png"), PNG_1X1);
+  await writeFile(join(characterDirectory, "avatar.ansi"), "old fallback\n");
+
+  await installPersonalAvatar(personalRoot, "example", await prepareAvatarImport(source));
+
+  assert.deepEqual(await readFile(join(characterDirectory, "avatar.png")), PNG_1X1);
+  assert.equal(await readFile(join(characterDirectory, "avatar.txt"), "utf8"), "new fallback\n");
+  await assert.rejects(readFile(join(characterDirectory, "avatar.ansi")));
+});
+
 test("rejects lossy imports and symbolic-link sources", async (t) => {
   const { root } = await workspace(t);
   const tooWide = join(root, "wide.txt");
@@ -56,11 +90,12 @@ test("rejects lossy imports and symbolic-link sources", async (t) => {
   await assert.rejects(prepareAvatarImport(linked), CharacterEditError);
 });
 
-test("removes both personal avatar formats", async (t) => {
+test("removes all personal avatar formats", async (t) => {
   const { personalRoot, characterDirectory } = await workspace(t);
   await writeFile(join(characterDirectory, "avatar.ansi"), "ansi\n");
   await writeFile(join(characterDirectory, "avatar.txt"), "plain\n");
+  await writeFile(join(characterDirectory, "avatar.png"), PNG_1X1);
 
-  assert.equal(await removePersonalAvatars(personalRoot, "example"), 2);
+  assert.equal(await removePersonalAvatars(personalRoot, "example"), 3);
   assert.equal(await removePersonalAvatars(personalRoot, "example"), 0);
 });

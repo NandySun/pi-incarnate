@@ -5,6 +5,7 @@ import {
   installPersonalAvatar,
   prepareAvatarContent,
   prepareAvatarImport,
+  preparePngAvatarContent,
   type PreparedAvatarImport,
 } from "./avatar-manager.ts";
 import {
@@ -25,6 +26,7 @@ const CHARACTER_BUNDLE_MAX_FILES = 66;
 interface CharacterBundleFileV1 {
   path: string;
   content: string;
+  encoding?: "base64";
 }
 
 interface CharacterBundleDocumentV1 {
@@ -38,7 +40,7 @@ export interface PreparedCharacterBundle {
   id: string;
   name: string;
   card: string;
-  avatar?: PreparedAvatarImport;
+  avatars: PreparedAvatarImport[];
   forms: Array<{ path: string; content: string }>;
 }
 
@@ -132,6 +134,19 @@ async function bundleDocument(character: Character): Promise<{ document: Charact
   const files: CharacterBundleFileV1[] = [{ path: "CHARACTER.md", content: card }];
 
   let avatarIncluded = false;
+  for (const filename of ["avatar.png"] as const) {
+    const avatarPath = join(character.directory, filename);
+    try {
+      await lstat(avatarPath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+      throw new CharacterEditError(`Cannot inspect avatar for export: ${avatarPath}`);
+    }
+    const avatar = await prepareAvatarImport(avatarPath);
+    if (avatar.kind !== "png") throw new CharacterEditError(`Unexpected avatar format: ${avatarPath}`);
+    files.push({ path: avatar.filename, content: avatar.content.toString("base64"), encoding: "base64" });
+    avatarIncluded = true;
+  }
   for (const filename of ["avatar.ansi", "avatar.txt"] as const) {
     const avatarPath = join(character.directory, filename);
     try {
@@ -141,6 +156,7 @@ async function bundleDocument(character: Character): Promise<{ document: Charact
       throw new CharacterEditError(`Cannot inspect avatar for export: ${avatarPath}`);
     }
     const avatar = await prepareAvatarImport(avatarPath);
+    if (avatar.kind !== "text") throw new CharacterEditError(`Unexpected avatar format: ${avatarPath}`);
     files.push({ path: avatar.filename, content: avatar.content });
     avatarIncluded = true;
     break;
@@ -219,6 +235,23 @@ export async function writeCharacterBundle(
   return summary;
 }
 
+function decodeBase64(value: string, path: string): Buffer {
+  if (value.length === 0 || value.length % 4 !== 0 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) {
+    throw new CharacterEditError(`Character bundle contains invalid base64 content: ${path}`);
+  }
+  const decoded = Buffer.from(value, "base64");
+  if (decoded.toString("base64") !== value) {
+    throw new CharacterEditError(`Character bundle contains non-canonical base64 content: ${path}`);
+  }
+  return decoded;
+}
+
+function bundleAvatarEntry(avatar: PreparedAvatarImport): CharacterBundleFileV1 {
+  return avatar.kind === "png"
+    ? { path: avatar.filename, content: avatar.content.toString("base64"), encoding: "base64" }
+    : { path: avatar.filename, content: avatar.content };
+}
+
 function validateBundleDocument(value: unknown): PreparedCharacterBundle {
   if (!isRecord(value) || value.format !== CHARACTER_BUNDLE_FORMAT || value.version !== CHARACTER_BUNDLE_VERSION) {
     throw new CharacterEditError("Unsupported character bundle format or version");
@@ -230,10 +263,15 @@ function validateBundleDocument(value: unknown): PreparedCharacterBundle {
     throw new CharacterEditError(`Character bundle must contain 1-${CHARACTER_BUNDLE_MAX_FILES} files`);
   }
 
-  const files = new Map<string, string>();
+  const files = new Map<string, CharacterBundleFileV1>();
   let contentBytes = 0;
   for (const entry of value.files) {
-    if (!isRecord(entry) || typeof entry.path !== "string" || typeof entry.content !== "string") {
+    if (
+      !isRecord(entry) ||
+      typeof entry.path !== "string" ||
+      typeof entry.content !== "string" ||
+      (entry.encoding !== undefined && entry.encoding !== "base64")
+    ) {
       throw new CharacterEditError("Character bundle contains an invalid file entry");
     }
     const path = normalizePortablePath(entry.path);
@@ -242,11 +280,13 @@ function validateBundleDocument(value: unknown): PreparedCharacterBundle {
     if (contentBytes > CHARACTER_BUNDLE_MAX_BYTES) {
       throw new CharacterEditError(`Character bundle content exceeds the ${CHARACTER_BUNDLE_MAX_BYTES}-byte limit`);
     }
-    files.set(path, entry.content);
+    files.set(path, { path, content: entry.content, ...(entry.encoding === "base64" ? { encoding: "base64" as const } : {}) });
   }
 
-  const card = files.get("CHARACTER.md");
-  if (card === undefined) throw new CharacterEditError("Character bundle is missing CHARACTER.md");
+  const cardEntry = files.get("CHARACTER.md");
+  if (cardEntry === undefined) throw new CharacterEditError("Character bundle is missing CHARACTER.md");
+  if (cardEntry.encoding !== undefined) throw new CharacterEditError("CHARACTER.md must use UTF-8 text content");
+  const card = cardEntry.content;
   if (byteLength(card) > CHARACTER_CARD_MAX_BYTES) {
     throw new CharacterEditError(`CHARACTER.md exceeds the ${CHARACTER_CARD_MAX_BYTES}-byte bundle limit`);
   }
@@ -261,15 +301,28 @@ function validateBundleDocument(value: unknown): PreparedCharacterBundle {
     }
   }
 
-  let avatar: PreparedAvatarImport | undefined;
+  const avatars: PreparedAvatarImport[] = [];
+  let textAvatarFound = false;
+  let pngAvatarFound = false;
   const forms: Array<{ path: string; content: string }> = [];
-  for (const [path, content] of files) {
+  for (const [path, entry] of files) {
     if (path === "CHARACTER.md") continue;
-    if (path === "avatar.ansi" || path === "avatar.txt") {
-      if (avatar) throw new CharacterEditError("Character bundle may contain only one avatar file");
-      avatar = prepareAvatarContent(path, content);
+    const { content, encoding } = entry;
+    if (path === "avatar.png") {
+      if (pngAvatarFound) throw new CharacterEditError("Character bundle may contain only one PNG avatar");
+      if (encoding !== "base64") throw new CharacterEditError("avatar.png must use base64 content");
+      avatars.push(preparePngAvatarContent(decodeBase64(content, path)));
+      pngAvatarFound = true;
       continue;
     }
+    if (path === "avatar.ansi" || path === "avatar.txt") {
+      if (textAvatarFound) throw new CharacterEditError("Character bundle may contain only one text avatar fallback");
+      if (encoding !== undefined) throw new CharacterEditError(`${path} must use UTF-8 text content`);
+      avatars.push(prepareAvatarContent(path, content));
+      textAvatarFound = true;
+      continue;
+    }
+    if (encoding !== undefined) throw new CharacterEditError(`Character bundle text file must not use base64: ${path}`);
     if (!allowedForms.has(path)) {
       throw new CharacterEditError(`Character bundle contains an undeclared file: ${path}`);
     }
@@ -278,7 +331,7 @@ function validateBundleDocument(value: unknown): PreparedCharacterBundle {
     }
     forms.push({ path, content });
   }
-  return { id: value.id, name: parsed.name, card, avatar, forms };
+  return { id: value.id, name: parsed.name, card, avatars, forms };
 }
 
 export async function prepareCharacterBundleImport(sourcePath: string): Promise<PreparedCharacterBundle> {
@@ -303,7 +356,7 @@ export async function installCharacterBundle(
     id: bundle.id,
     files: [
       { path: "CHARACTER.md", content: bundle.card },
-      ...(bundle.avatar ? [{ path: bundle.avatar.filename, content: bundle.avatar.content }] : []),
+      ...bundle.avatars.map(bundleAvatarEntry),
       ...bundle.forms.map((form) => ({ path: form.path, content: form.content })),
     ],
   });
@@ -317,7 +370,7 @@ export async function installCharacterBundle(
     for (const form of validated.forms) {
       await savePersonalForm(stagingRoot, validated.id, form.path, form.content);
     }
-    if (validated.avatar) await installPersonalAvatar(stagingRoot, validated.id, validated.avatar);
+    for (const avatar of validated.avatars) await installPersonalAvatar(stagingRoot, validated.id, avatar);
     const staged = await loadCharacter(stagingRoot, validated.id);
     await rename(staged.directory, target);
     return await loadCharacter(canonicalRoot, validated.id);

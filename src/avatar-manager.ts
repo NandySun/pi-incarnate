@@ -8,19 +8,34 @@ import {
   AVATAR_MAX_BYTES,
   AVATAR_MAX_COLUMNS,
   AVATAR_MAX_LINES,
+  AVATAR_PNG_MAX_BYTES,
   sanitizeAnsiAvatar,
   sanitizeAvatar,
+  validatePngAvatar,
+  AvatarLoadError,
 } from "./avatar.ts";
 import { CharacterEditError, resolvePersonalDirectory } from "./character-editor.ts";
 
-export type AvatarFileName = "avatar.ansi" | "avatar.txt";
+export type TextAvatarFileName = "avatar.ansi" | "avatar.txt";
+export type AvatarFileName = "avatar.png" | TextAvatarFileName;
 
-export interface PreparedAvatarImport {
-  filename: AvatarFileName;
+export interface PreparedTextAvatarImport {
+  kind: "text";
+  filename: TextAvatarFileName;
   content: string;
   width: number;
   height: number;
 }
+
+export interface PreparedPngAvatarImport {
+  kind: "png";
+  filename: "avatar.png";
+  content: Buffer;
+  width: number;
+  height: number;
+}
+
+export type PreparedAvatarImport = PreparedTextAvatarImport | PreparedPngAvatarImport;
 
 function stripWrappingQuotes(value: string): string {
   if (value.length < 2) return value;
@@ -40,7 +55,7 @@ export function resolveAvatarSourcePath(input: string, cwd: string, userHome = h
   return resolveUserPath(input, cwd, userHome);
 }
 
-export function prepareAvatarContent(filename: AvatarFileName, raw: string): PreparedAvatarImport {
+export function prepareAvatarContent(filename: TextAvatarFileName, raw: string): PreparedTextAvatarImport {
   if (Buffer.byteLength(raw, "utf8") > AVATAR_MAX_BYTES) {
     throw new CharacterEditError(`Avatar exceeds the ${AVATAR_MAX_BYTES}-byte limit`);
   }
@@ -50,6 +65,7 @@ export function prepareAvatarContent(filename: AvatarFileName, raw: string): Pre
     throw new CharacterEditError(`Avatar must fit within ${AVATAR_MAX_COLUMNS} columns and ${AVATAR_MAX_LINES} lines`);
   }
   return {
+    kind: "text",
     filename,
     content: `${avatar.lines.join("\n")}\n`,
     width: avatar.lines.reduce((maximum, line) => Math.max(maximum, visibleWidth(line)), 0),
@@ -57,12 +73,31 @@ export function prepareAvatarContent(filename: AvatarFileName, raw: string): Pre
   };
 }
 
+export function preparePngAvatarContent(bytes: Uint8Array): PreparedPngAvatarImport {
+  try {
+    const image = validatePngAvatar(bytes);
+    return {
+      kind: "png",
+      filename: "avatar.png",
+      content: Buffer.from(bytes),
+      width: image.widthPx,
+      height: image.heightPx,
+    };
+  } catch (error) {
+    if (error instanceof AvatarLoadError) throw new CharacterEditError(error.message);
+    throw error;
+  }
+}
+
 export async function prepareAvatarImport(sourcePath: string): Promise<PreparedAvatarImport> {
   const extension = extname(sourcePath).toLowerCase();
   let filename: AvatarFileName;
+  let maximumBytes: number;
   if (extension === ".ansi") filename = "avatar.ansi";
   else if (extension === ".txt") filename = "avatar.txt";
-  else throw new CharacterEditError("Avatar file must end in .ansi or .txt");
+  else if (extension === ".png") filename = "avatar.png";
+  else throw new CharacterEditError("Avatar file must end in .png, .ansi, or .txt");
+  maximumBytes = filename === "avatar.png" ? AVATAR_PNG_MAX_BYTES : AVATAR_MAX_BYTES;
 
   let bytes: Buffer;
   try {
@@ -70,17 +105,19 @@ export async function prepareAvatarImport(sourcePath: string): Promise<PreparedA
     if (!info.isFile() || info.isSymbolicLink()) {
       throw new CharacterEditError(`Avatar source must be a regular file: ${sourcePath}`);
     }
-    if (info.size > AVATAR_MAX_BYTES) {
-      throw new CharacterEditError(`Avatar exceeds the ${AVATAR_MAX_BYTES}-byte limit: ${sourcePath}`);
+    if (info.size > maximumBytes) {
+      throw new CharacterEditError(`Avatar exceeds the ${maximumBytes}-byte limit: ${sourcePath}`);
     }
     bytes = await readFile(sourcePath);
-    if (bytes.byteLength > AVATAR_MAX_BYTES) {
-      throw new CharacterEditError(`Avatar exceeds the ${AVATAR_MAX_BYTES}-byte limit: ${sourcePath}`);
+    if (bytes.byteLength > maximumBytes) {
+      throw new CharacterEditError(`Avatar exceeds the ${maximumBytes}-byte limit: ${sourcePath}`);
     }
   } catch (error) {
     if (error instanceof CharacterEditError) throw error;
     throw new CharacterEditError(`Cannot read avatar source: ${sourcePath}`);
   }
+
+  if (filename === "avatar.png") return preparePngAvatarContent(bytes);
 
   let raw: string;
   try {
@@ -108,26 +145,31 @@ export async function installPersonalAvatar(
 ): Promise<string> {
   const directory = await resolvePersonalDirectory(personalRoot, id);
   const targetPath = join(directory, prepared.filename);
-  const alternatePath = join(directory, prepared.filename === "avatar.ansi" ? "avatar.txt" : "avatar.ansi");
+  const alternatePath = prepared.kind === "text"
+    ? join(directory, prepared.filename === "avatar.ansi" ? "avatar.txt" : "avatar.ansi")
+    : undefined;
   await assertReplaceable(targetPath);
-  await assertReplaceable(alternatePath);
+  if (alternatePath) await assertReplaceable(alternatePath);
 
   const nonce = crypto.randomUUID();
   const temporaryPath = join(directory, `.avatar-import-${nonce}.tmp`);
   const alternateBackup = join(directory, `.avatar-replaced-${nonce}.tmp`);
   let movedAlternate = false;
   try {
-    await writeFile(temporaryPath, prepared.content, { encoding: "utf8", flag: "wx" });
-    try {
-      await rename(alternatePath, alternateBackup);
-      movedAlternate = true;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    if (prepared.kind === "png") await writeFile(temporaryPath, prepared.content, { flag: "wx" });
+    else await writeFile(temporaryPath, prepared.content, { encoding: "utf8", flag: "wx" });
+    if (alternatePath) {
+      try {
+        await rename(alternatePath, alternateBackup);
+        movedAlternate = true;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
     }
     await rename(temporaryPath, targetPath);
     if (movedAlternate) await rm(alternateBackup, { force: true });
   } catch (error) {
-    if (movedAlternate) await rename(alternateBackup, alternatePath).catch(() => undefined);
+    if (movedAlternate && alternatePath) await rename(alternateBackup, alternatePath).catch(() => undefined);
     throw new CharacterEditError(`Cannot install avatar for ${id}: ${error instanceof Error ? error.message : "unknown error"}`);
   } finally {
     await rm(temporaryPath, { force: true });
@@ -138,7 +180,7 @@ export async function installPersonalAvatar(
 export async function removePersonalAvatars(personalRoot: string, id: string): Promise<number> {
   const directory = await resolvePersonalDirectory(personalRoot, id);
   let removed = 0;
-  for (const filename of ["avatar.ansi", "avatar.txt"] as const) {
+  for (const filename of ["avatar.png", "avatar.ansi", "avatar.txt"] as const) {
     const path = join(directory, filename);
     try {
       const info = await lstat(path);

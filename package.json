@@ -1,6 +1,6 @@
 {
   "name": "pi-incarnate",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A character persona layer for Pi Agent",
   "author": "NandySun",
   "type": "module",
